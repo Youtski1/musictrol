@@ -60,9 +60,9 @@ Item {
             readonly property bool active: Lyrics.synced && index === view.current
             // Чем дальше от текущей строки, тем прозрачнее — без скачков шрифта.
             readonly property int distance: Lyrics.synced ? Math.abs(index - view.current) : 0
-            // Ширина с запасом под увеличение текущей строки — чтобы не вылезала за рамку.
-            width: ListView.view.width / 1.1
-            x: (ListView.view.width - width) / 2
+            // Полная ширина с небольшими полями; строка не увеличивается — за рамку не вылезет.
+            width: ListView.view.width - 12
+            x: 6
             height: Math.max(view.fontSize + 12, implicitHeight + 6)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -78,11 +78,8 @@ Item {
             font.weight: Font.DemiBold
             color: active ? "white" : Qt.lighter(view.accent, 1.9)
             opacity: !Lyrics.synced ? 0.75 : active ? 1 : distance === 1 ? 0.45 : 0.22
-            scale: active ? 1.08 : 1
-            transformOrigin: Item.Center
             Behavior on color { ColorAnimation { duration: 500; easing.type: Easing.InOutQuad } }
             Behavior on opacity { NumberAnimation { duration: 550; easing.type: Easing.InOutQuad } }
-            Behavior on scale { NumberAnimation { duration: 550; easing.type: Easing.OutCubic } }
 
             MouseArea {
                 anchors.fill: parent
@@ -102,8 +99,8 @@ Item {
             anchors.fill: parent
             gradient: Gradient {
                 GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 0.3; color: "white" }
-                GradientStop { position: 0.7; color: "white" }
+                GradientStop { position: 0.12; color: "white" }
+                GradientStop { position: 0.88; color: "white" }
                 GradientStop { position: 1.0; color: "transparent" }
             }
         }
