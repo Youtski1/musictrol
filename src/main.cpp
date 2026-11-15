@@ -9,6 +9,7 @@
 #include "core/AppSettings.h"
 #include "core/Library.h"
 #include "core/MusicController.h"
+#include "desktop/GlobalHotkeys.h"
 
 namespace {
 QString instanceName()
@@ -57,6 +58,8 @@ int main(int argc, char *argv[])
     MusicController controller;
     MusicController::setInstance(&controller);
     QObject::connect(&controller, &MusicController::trackStarted, &library, &Library::addToHistory);
+    GlobalHotkeys hotkeys;
+    GlobalHotkeys::setInstance(&hotkeys);
 
     QLocalServer server;
     if (!snapshotMode) {

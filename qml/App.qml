@@ -17,46 +17,73 @@ QtObject {
         onCapsuleRequested: app.mini.setWaveMode(!app.mini.waveMode)
     }
 
+    // Глобальные горячие клавиши.
+    property Connections hotkeys: Connections {
+        target: GlobalHotkeys
+        function onTriggered(id) {
+            switch (id) {
+            case "panel": app.panel.toggle(app.mini.screen); break
+            case "playPause": Music.togglePause(); break
+            case "next": Music.next(); break
+            case "prev": Music.previous(); break
+            case "volUp":
+                Music.player.muted = false
+                Music.player.volume = Math.min(100, Music.player.volume + 5)
+                break
+            case "volDown": Music.player.volume = Math.max(0, Music.player.volume - 5); break
+            case "wave": app.mini.setWaveMode(!app.mini.waveMode); break
+            }
+        }
+    }
+
     // Повторный запуск программы — открыть панель музыки.
     property Connections activation: Connections {
         target: AppSettings
         function onActivateRequested() { app.panel.open(app.mini.screen) }
     }
 
-    // Режим разработчика: --snapshot <папка> — снимки виджетов.
+    // Режим разработчика: --snapshot <папка> — снимки виджетов по шагам.
     readonly property int snapshotArg: Qt.application.arguments.indexOf("--snapshot")
     property Timer snapshotTimer: Timer {
         running: app.snapshotArg > 0
         interval: 2500
-        property int step: 0
         repeat: true
+        property int step: 0
         onTriggered: {
             const dir = Qt.application.arguments[app.snapshotArg + 1]
             const save = (win, name) => win.contentItem.grabToImage(r => r.saveToFile(dir + "/" + name + ".png"))
-            switch (step) {
-            case 0:
-                save(app.mainWidget, "player")
-                save(app.mini, "capsule-circle")
-                app.mini.forceExpanded(true)
-                interval = 900
-                break
-            case 1:
-                save(app.mini, "capsule-expanded")
-                app.mini.forceExpanded(false)
-                app.mini.setWaveMode(true)
-                break
-            case 2:
-                save(app.mini, "capsule-wave")
-                app.mini.setWaveMode(false)
-                app.panel.open(app.mini.screen)
-                interval = 1200
-                break
-            case 3:
-                app.panel.contentItem.grabToImage(r => { r.saveToFile(dir + "/panel.png"); Qt.quit() })
-                stop()
-                break
-            }
-            step++
+            const steps = [
+                () => {
+                    save(app.mainWidget, "player")
+                    save(app.mini, "capsule-circle")
+                    console.log("hotkeys:", JSON.stringify(GlobalHotkeys.actions.map(a => a.id + "=" + a.sequence + ":" + a.status)))
+                    app.mainWidget.setSettingsOpen(true)
+                    app.mainWidget.showHotkeysPage(true)
+                    interval = 1500
+                },
+                () => {
+                    save(app.mainWidget, "hotkeys")
+                    app.mainWidget.setSettingsOpen(false)
+                    app.mini.forceExpanded(true)
+                    interval = 900
+                },
+                () => {
+                    save(app.mini, "capsule-expanded")
+                    app.mini.forceExpanded(false)
+                    app.mini.setWaveMode(true)
+                },
+                () => {
+                    save(app.mini, "capsule-wave")
+                    app.mini.setWaveMode(false)
+                    app.panel.open(app.mini.screen)
+                    interval = 1200
+                },
+                () => {
+                    app.panel.contentItem.grabToImage(r => { r.saveToFile(dir + "/panel.png"); Qt.quit() })
+                    stop()
+                }
+            ]
+            steps[step++]()
         }
     }
 }

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Effects
+import QtQuick.Shapes
 import QtQuick.Layouts
 import QtQuick.Window
 import QtCore
@@ -24,7 +25,8 @@ Window {
     title: "Musictrol"
     // Размер окна постоянный (по большей из сторон) — во время анимаций окно не меняется.
     width: cardWidth + shadowMargin * 2
-    height: Math.max(playerColumn.implicitHeight + 40, settingsColumn.implicitHeight + 36) + shadowMargin * 2
+    height: Math.max(playerColumn.implicitHeight + 40, settingsColumn.implicitHeight + 36,
+                     hotkeysColumn.implicitHeight + 36) + shadowMargin * 2
     visible: true
 
     // Цвет обложки плавно перетекает при смене трека.
@@ -62,6 +64,7 @@ Window {
     }
 
     function peekVolume() { volume.peek() }
+    function showHotkeysPage(on) { card.showHotkeys = on }
 
     function setSettingsOpen(open) {
         if (open)
@@ -77,11 +80,16 @@ Window {
         originX: x
         originY: y
         width: win.cardWidth
-        height: showSettings ? settingsColumn.implicitHeight + 36 : playerColumn.implicitHeight + 40
+        height: showSettings ? (showHotkeys ? hotkeysColumn.implicitHeight + 36 : settingsColumn.implicitHeight + 36)
+                             : playerColumn.implicitHeight + 40
         tintOpacity: prefs.glassOpacity
         accent: win.accent
+        backdrop: Music.currentThumbnail
+        backdropOpacity: 0.5
 
         property bool showSettings: false
+        property bool showHotkeys: false
+        onShowSettingsChanged: if (!showSettings) showHotkeys = false
         // Точка, откуда растёт круг настроек (центр шестерёнки).
         property point revealOrigin: Qt.point(width - 40, 36)
 
@@ -131,17 +139,25 @@ Window {
                 anchors.margins: 20
                 spacing: 12
 
+                // Крупная обложка слева, справа — кнопки, название и исполнитель.
                 RowLayout {
-                    spacing: 14
+                    spacing: 16
                     Layout.fillWidth: true
 
                     Item {
-                        Layout.preferredWidth: 72
-                        Layout.preferredHeight: 72
+                        Layout.preferredWidth: 140
+                        Layout.preferredHeight: 140
 
+                        RectangularShadow {
+                            anchors.fill: parent
+                            radius: 16
+                            blur: 22
+                            offset.y: 8
+                            color: Qt.rgba(0, 0, 0, 0.45)
+                        }
                         Rectangle {
                             anchors.fill: parent
-                            radius: 12
+                            radius: 16
                             gradient: Gradient {
                                 GradientStop { position: 0; color: Qt.lighter(win.accent, 1.2) }
                                 GradientStop { position: 1; color: Qt.darker(win.accent, 2.4) }
@@ -150,7 +166,7 @@ Window {
                             Icon {
                                 anchors.centerIn: parent
                                 name: "music"
-                                size: 26
+                                size: 40
                                 color: Qt.rgba(1, 1, 1, 0.8)
                                 visible: !Music.hasTrack
                             }
@@ -158,21 +174,70 @@ Window {
                         RoundedImage {
                             id: cover
                             anchors.fill: parent
-                            radius: 12
-                            source: Music.currentThumbnail
+                            radius: 16
+                            source: Music.currentThumbnail ? Music.currentThumbnail.toString().replace("mqdefault", "hq720") : ""
+                            fallbackSource: Music.currentThumbnail
                         }
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 140
                         spacing: 4
+
+                        // Маленькие кнопки: поиск, капсула, булавка, настройки.
+                        Row {
+                            Layout.alignment: Qt.AlignRight
+                            Layout.rightMargin: -6
+                            spacing: 0
+                            IconButton {
+                                iconName: "search"
+                                text: "Поиск"
+                                implicitWidth: 30; implicitHeight: 32
+                                iconSize: 16
+                                iconColor: Theme.faint
+                                onClicked: win.searchRequested()
+                            }
+                            IconButton {
+                                iconName: "wave"
+                                text: "Выпустить капсулу (перемотка сверху)"
+                                implicitWidth: 30; implicitHeight: 32
+                                iconSize: 16
+                                iconColor: Theme.faint
+                                onClicked: win.capsuleRequested()
+                            }
+                            IconButton {
+                                iconName: "pin"
+                                text: prefs.locked ? "Открепить" : "Закрепить на месте"
+                                implicitWidth: 30; implicitHeight: 32
+                                iconSize: 16
+                                iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
+                                baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
+                                onClicked: prefs.locked = !prefs.locked
+                            }
+                            IconButton {
+                                id: gearBtn
+                                iconName: "settings"
+                                text: "Настройки"
+                                implicitWidth: 30; implicitHeight: 32
+                                iconSize: 16
+                                iconColor: Theme.faint
+                                onClicked: win.setSettingsOpen(true)
+                            }
+                        }
+
+                        Item { Layout.fillHeight: true }
+
                         Label {
                             Layout.fillWidth: true
                             text: Music.hasTrack ? Music.currentTitle : "Ничего не играет"
                             color: Theme.fg
-                            font.pixelSize: 17
+                            font.pixelSize: 18
                             font.weight: Font.DemiBold
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
                             elide: Text.ElideRight
+                            lineHeight: 1.05
                         }
                         Label {
                             Layout.fillWidth: true
@@ -181,49 +246,7 @@ Window {
                             color: Theme.dim
                             font.pixelSize: 13
                             elide: Text.ElideRight
-                        }
-                    }
-
-                    // Маленькие кнопки сверху справа: поиск, булавка, настройки.
-                    Row {
-                        Layout.alignment: Qt.AlignTop
-                        spacing: 0
-                        IconButton {
-                            iconName: "search"
-                            text: "Поиск"
-                            implicitWidth: 30; implicitHeight: 32
-                            iconSize: 16
-                            iconColor: Theme.faint
-                            onClicked: win.searchRequested()
-                        }
-                        IconButton {
-                            iconName: "wave"
-                            text: "Выпустить капсулу (перемотка сверху)"
-                            implicitWidth: 30; implicitHeight: 32
-                            iconSize: 16
-                            iconColor: Theme.faint
-                            onClicked: win.capsuleRequested()
-                        }
-                        IconButton {
-                            iconName: "pin"
-                            text: prefs.locked ? "Открепить" : "Закрепить на месте"
-                            implicitWidth: 30; implicitHeight: 32
-                            iconSize: 16
-                            iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
-                            baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
-                            onClicked: prefs.locked = !prefs.locked
-                        }
-                        IconButton {
-                            id: gearBtn
-                            iconName: "settings"
-                            text: "Настройки"
-                            implicitWidth: 30; implicitHeight: 32
-                            iconSize: 16
-                            iconColor: Theme.faint
-                            onClicked: {
-                                card.revealOrigin = gearBtn.mapToItem(card, width / 2, height / 2)
-                                card.showSettings = true
-                            }
+                            Layout.bottomMargin: 2
                         }
                     }
                 }
@@ -308,7 +331,7 @@ Window {
         // ── Настройки: раскрываются кругом из шестерёнки ─────────────────
         readonly property real revealMax: {
             const o = revealOrigin
-            const h = Math.max(height, settingsColumn.implicitHeight + 36)
+            const h = Math.max(height, settingsColumn.implicitHeight + 36, hotkeysColumn.implicitHeight + 36)
             return Math.hypot(Math.max(o.x, width - o.x), Math.max(o.y, h - o.y)) + 2
         }
         property real revealRadius: showSettings ? revealMax : 0
@@ -342,6 +365,15 @@ Window {
                 anchors.top: parent.top
                 anchors.margins: 18
                 spacing: 14
+                // Уезжает влево, когда открыта страница горячих клавиш.
+                opacity: card.showHotkeys ? 0 : 1
+                visible: opacity > 0.01
+                enabled: !card.showHotkeys
+                transform: Translate {
+                    x: card.showHotkeys ? -40 : 0
+                    Behavior on x { NumberAnimation { duration: 380; easing.type: Easing.OutCubic } }
+                }
+                Behavior on opacity { NumberAnimation { duration: 260 } }
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -403,10 +435,30 @@ Window {
                     }
                 }
 
-                RowLayout {
+                AbstractButton {
+                    id: hotkeysEntry
                     Layout.fillWidth: true
-                    Label { text: "Горячие клавиши"; color: Theme.faint; font.pixelSize: 14; Layout.fillWidth: true }
-                    Label { text: "скоро"; color: Theme.faint; font.pixelSize: 12 }
+                    implicitHeight: 36
+                    hoverEnabled: true
+                    focusPolicy: Qt.NoFocus
+                    onClicked: card.showHotkeys = true
+                    background: Rectangle {
+                        radius: 10
+                        color: hotkeysEntry.hovered ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
+                    }
+                    contentItem: RowLayout {
+                        Label { text: "Горячие клавиши"; color: Theme.fg; font.pixelSize: 14; Layout.fillWidth: true }
+                        Label {
+                            text: {
+                                const a = GlobalHotkeys.actions
+                                const n = a.filter(x => x.sequence.length > 0).length
+                                return n > 0 ? n + " назначено" : "не заданы"
+                            }
+                            color: Theme.faint
+                            font.pixelSize: 12
+                        }
+                        Icon { name: "back"; size: 14; color: Theme.faint; rotation: 180 }
+                    }
                 }
 
                 Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(1, 1, 1, 0.08) }
@@ -432,6 +484,85 @@ Window {
                             Label { text: quitBtn.text; color: "#ff8a95"; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter }
                         }
                     }
+                }
+            }
+
+            // ── Горячие клавиши (подстраница настроек) ───────────────────
+            ColumnLayout {
+                id: hotkeysColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 18
+                spacing: 8
+                opacity: card.showHotkeys ? 1 : 0
+                visible: opacity > 0.01
+                enabled: card.showHotkeys
+                transform: Translate {
+                    x: card.showHotkeys ? 0 : 40
+                    Behavior on x { NumberAnimation { duration: 380; easing.type: Easing.OutCubic } }
+                }
+                Behavior on opacity { NumberAnimation { duration: 260 } }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 4
+                    IconButton {
+                        iconName: "back"
+                        text: "Назад к настройкам"
+                        implicitWidth: 32; implicitHeight: 32
+                        iconSize: 16
+                        iconColor: Theme.dim
+                        Layout.leftMargin: -4
+                        onClicked: card.showHotkeys = false
+                    }
+                    Label {
+                        text: "Горячие клавиши"
+                        color: Theme.fg
+                        font.pixelSize: 17
+                        font.weight: Font.DemiBold
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        iconName: "close"
+                        text: "Закрыть настройки"
+                        implicitWidth: 32; implicitHeight: 32
+                        iconSize: 16
+                        iconColor: Theme.dim
+                        Layout.rightMargin: -2
+                        onClicked: card.showSettings = false
+                    }
+                }
+
+                Repeater {
+                    model: GlobalHotkeys.actions
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Label {
+                            text: modelData.title
+                            color: Theme.fg
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        KeyChip {
+                            actionId: modelData.id
+                            sequence: modelData.sequence
+                            status: modelData.status
+                            accent: win.accent
+                            onCaptureStarted: win.requestActivate()
+                        }
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    text: "Нажмите на сочетание и введите новое. Backspace — убрать, Esc — отмена. Работают из любой программы."
+                    color: Theme.faint
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
                 }
             }
         }

@@ -64,8 +64,8 @@ Window {
 
     Timer { id: hideTimer; interval: 280; onTriggered: overlay.hide() }
 
-    // Ушли в другое окно — панель закрывается сама.
-    onActiveChanged: if (!active && opened) Qt.callLater(() => { if (!overlay.active) overlay.close() })
+    // Потеря фокуса панель НЕ закрывает (всплывающая громкость XFCE и т.п.
+    // забирают фокус). Закрыть: Esc, клик по затемнению, кнопка или горячая клавиша.
 
     Shortcut {
         sequences: [StandardKey.Cancel]

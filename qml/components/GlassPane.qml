@@ -22,6 +22,9 @@ Item {
     property bool useWallpaper: true
     property color borderColor: Theme.glassBorder
     property real shadowBlur: 36
+    // Размытая картинка-подложка (обложка трека) под тонировкой.
+    property url backdrop
+    property real backdropOpacity: 0.55
 
     default property alias content: holder.data
 
@@ -53,6 +56,29 @@ Item {
             height: pane.Screen.height
             smooth: true
             cache: false
+        }
+
+        // Обложка: крошечная картинка, растянутая и размытая, — дёшево и мягко.
+        Image {
+            id: backdropImg
+            anchors.fill: parent
+            source: pane.backdrop
+            sourceSize: Qt.size(48, 48)
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            smooth: true
+            visible: false
+        }
+        MultiEffect {
+            anchors.fill: parent
+            source: backdropImg
+            blurEnabled: true
+            blur: 1.0
+            blurMax: 48
+            saturation: 0.25
+            visible: pane.backdrop.toString().length > 0
+            opacity: backdropImg.status === Image.Ready ? pane.backdropOpacity : 0
+            Behavior on opacity { NumberAnimation { duration: 600 } }
         }
 
         Rectangle {

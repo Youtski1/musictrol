@@ -138,6 +138,10 @@ Window {
         radius: height / 2
         borderColor: (mini.panelOpen || waveArea.dragging) ? Qt.alpha(mini.accent, 0.65) : Theme.glassBorder
 
+        // В покое капсула слегка прозрачная — вписывается в любое окно под ней.
+        opacity: (mini.hoverHold || mini.panelOpen || waveArea.dragging) ? 1 : (mini.waveMode ? 0.82 : 0.7)
+        Behavior on opacity { NumberAnimation { duration: 300 } }
+
         readonly property real fullWidth: cover.width + cornerRow.implicitWidth + 22
 
         x: mini.waveMode ? (mini.width - mini.waveWidth) / 2 : mini.cornerMargin

@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 Network Concurrent)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
-pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb xcb-shape)
+pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb xcb-shape xcb-keysyms)
 
 qt_standard_project_setup(REQUIRES 6.9)
 
@@ -31,6 +31,8 @@ qt_add_executable(musictrol
     src/desktop/WindowHelper.cpp
     src/desktop/Wallpaper.h
     src/desktop/Wallpaper.cpp
+    src/desktop/GlobalHotkeys.h
+    src/desktop/GlobalHotkeys.cpp
 )
 
 # Подпапки нужны генератору регистрации QML-типов: он подключает заголовки по имени файла.
@@ -52,6 +54,7 @@ qt_add_qml_module(musictrol
         qml/components/GlassSlider.qml
         qml/components/VolumePill.qml
         qml/components/WaveSeek.qml
+        qml/components/KeyChip.qml
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml
