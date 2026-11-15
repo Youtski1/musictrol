@@ -21,8 +21,13 @@ QtObject {
             const item = app.mainWidget.contentItem
             if (step === 0) {
                 item.grabToImage(r => r.saveToFile(dir + "/player.png"))
-                app.mainWidget.setSettingsOpen(true)
+                app.mainWidget.peekVolume()
+                interval = 600
             } else if (step === 1) {
+                item.grabToImage(r => r.saveToFile(dir + "/volume.png"))
+                app.mainWidget.setSettingsOpen(true)
+                interval = 2500
+            } else if (step === 2) {
                 item.grabToImage(r => r.saveToFile(dir + "/settings.png"))
                 app.mainWidget.setSettingsOpen(false)
             } else {

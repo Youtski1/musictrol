@@ -61,6 +61,8 @@ Window {
         WindowHelper.setInputRect(win, card.x, card.y, card.width, card.height)
     }
 
+    function peekVolume() { volume.peek() }
+
     function setSettingsOpen(open) {
         if (open)
             card.revealOrigin = gearBtn.mapToItem(card, gearBtn.width / 2, gearBtn.height / 2)
@@ -244,13 +246,21 @@ Window {
                     Layout.fillWidth: true
                     spacing: 6
 
+                    // Пока раскрыта громкость, кнопка караоке схлопывается и отдаёт ей место.
                     IconButton {
+                        id: karaokeBtn
                         iconName: "lyrics"
                         text: "Караоке"
                         round: false
                         iconColor: Qt.lighter(win.accent, 1.35)
                         baseColor: Qt.alpha(win.accent, 0.18)
                         onClicked: win.karaokeRequested()
+                        Layout.preferredWidth: volume.expanded ? 0 : 40
+                        Behavior on Layout.preferredWidth { NumberAnimation { duration: 420; easing.type: Easing.OutQuint } }
+                        opacity: volume.expanded ? 0 : 1
+                        Behavior on opacity { NumberAnimation { duration: 260 } }
+                        visible: Layout.preferredWidth > 1
+                        clip: true
                     }
                     Item { Layout.fillWidth: true }
                     IconButton {

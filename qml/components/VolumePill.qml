@@ -9,7 +9,8 @@ Item {
 
     property color accent: Theme.brand
     readonly property int collapsedWidth: 36
-    readonly property int expandedWidth: 144
+    // Ширина подобрана под ряд кнопок карточки (340 px): кнопки + капсула помещаются ровно.
+    property int expandedWidth: 160
 
     // Раскрыта, пока над ней мышь, пока тянут ползунок и ещё немного после.
     readonly property bool expanded: hover.hovered || slider.pressed || stayTimer.running
