@@ -37,7 +37,7 @@ Window {
     signal capsuleEnabledChosen(bool enabled)
 
     readonly property int shadowMargin: 40
-    readonly property int cardWidth: 380
+    readonly property int cardWidth: 420
 
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnBottomHint
     color: "transparent"
@@ -328,6 +328,7 @@ Window {
                     VolumePill {
                         id: volume
                         accent: win.accent
+                        expandedWidth: 196   // карточка 420: кнопки + капсула помещаются ровно
                     }
                 }
 

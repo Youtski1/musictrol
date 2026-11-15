@@ -17,7 +17,8 @@ Item {
     property int frozenLine: -1
     readonly property int current: active ? (Lyrics.synced ? Lyrics.lineAt(Music.player.position) : -1) : frozenLine
     onCurrentChanged: if (active) frozenLine = current
-    implicitHeight: Lyrics.status === "found" ? (Lyrics.synced ? visibleLines * (fontSize + 14) + fontSize : 110) : 30
+    // С запасом: текущая строка может занять два ряда.
+    implicitHeight: Lyrics.status === "found" ? (Lyrics.synced ? (visibleLines + 1) * (fontSize + 16) : 110) : 30
 
     Text {
         anchors.centerIn: parent
