@@ -7,7 +7,8 @@
 namespace {
 QString thumbnailFor(const QString &videoId)
 {
-    return QStringLiteral("https://i.ytimg.com/vi/%1/hqdefault.jpg").arg(videoId);
+    // mqdefault — 16:9 без чёрных полос сверху/снизу (у hqdefault они есть).
+    return QStringLiteral("https://i.ytimg.com/vi/%1/mqdefault.jpg").arg(videoId);
 }
 } // namespace
 

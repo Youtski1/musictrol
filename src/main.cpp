@@ -1,6 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <clocale>
 
 #include "core/MusicController.h"
@@ -11,6 +12,10 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationName(QStringLiteral("musictrol"));
     QGuiApplication::setOrganizationName(QStringLiteral("musictrol"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Musictrol"));
+    // Виджеты живут без «главного окна»: закрытие окна поиска не выходит из программы.
+    QGuiApplication::setQuitOnLastWindowClosed(false);
+    // Прозрачные окна-виджеты.
+    QQuickWindow::setDefaultAlphaBuffer(true);
 
     // libmpv требует «C»-локаль для чисел (Qt выставляет системную).
     std::setlocale(LC_NUMERIC, "C");
@@ -25,8 +30,7 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
-    // Шаг 1: временное тестовое окно. На следующих шагах его заменят виджеты.
-    engine.loadFromModule("Musictrol", "DevWindow");
+    engine.loadFromModule("Musictrol", "App");
 
     return app.exec();
 }

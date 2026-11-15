@@ -1,6 +1,9 @@
 #include "core/MusicController.h"
 
+#include <QImage>
 #include <QJSEngine>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QQmlEngine>
 #include <cmath>
 
@@ -8,12 +11,42 @@
 
 MusicController *MusicController::s_instance = nullptr;
 
+namespace {
+// «Живой» цвет обложки: средний цвет, где яркие и насыщенные пиксели весят больше.
+// Тёмно-серые и почти белые почти не учитываются, чтобы не получить грязный цвет.
+QColor vibrantColor(const QImage &source)
+{
+    const QImage img = source.scaled(32, 32, Qt::IgnoreAspectRatio, Qt::FastTransformation)
+                           .convertToFormat(QImage::Format_RGB32);
+    double r = 0, g = 0, b = 0, total = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(img.constScanLine(y));
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c = QColor::fromRgb(line[x]);
+            const double s = c.hsvSaturationF();
+            const double v = c.valueF();
+            const double w = s * s * v + 0.002;
+            r += c.redF() * w; g += c.greenF() * w; b += c.blueF() * w;
+            total += w;
+        }
+    }
+    QColor c = QColor::fromRgbF(float(r / total), float(g / total), float(b / total));
+    // Подтягиваем к «неоновому» виду: достаточно насыщенный и светлый.
+    float h, s, v;
+    c.getHsvF(&h, &s, &v);
+    if (h < 0)
+        return QColor(0xff, 0x2a, 0x36); // обложка почти без цвета — фирменный красный
+    return QColor::fromHsvF(h, std::max(s, 0.65f), std::max(v, 0.85f));
+}
+} // namespace
+
 MusicController::MusicController(QObject *parent)
     : QObject(parent)
     , m_player(new MpvPlayer(this))
     , m_search(new YouTubeSearch(this))
     , m_results(new TrackListModel(this))
     , m_queue(new TrackListModel(this))
+    , m_net(new QNetworkAccessManager(this))
 {
     connect(m_search, &YouTubeSearch::busyChanged, this, &MusicController::searchingChanged);
     connect(m_search, &YouTubeSearch::resultsReady, this, [this](const TrackList &tracks) {
@@ -138,4 +171,35 @@ void MusicController::playTrack(const Track &track)
     clearError();
     m_player->load(track.url);
     emit currentChanged();
+    fetchAccent(track.thumbnail);
+}
+
+void MusicController::fetchAccent(const QString &thumbnailUrl)
+{
+    if (m_coverReply) {
+        m_coverReply->abort();
+        m_coverReply = nullptr;
+    }
+    if (thumbnailUrl.isEmpty())
+        return;
+
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(thumbnailUrl)));
+    m_coverReply = reply;
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        reply->deleteLater();
+        if (reply != m_coverReply || reply->error() != QNetworkReply::NoError)
+            return;
+        m_coverReply = nullptr;
+        QImage img;
+        if (img.loadFromData(reply->readAll()))
+            setAccent(vibrantColor(img));
+    });
+}
+
+void MusicController::setAccent(const QColor &color)
+{
+    if (m_accent == color)
+        return;
+    m_accent = color;
+    emit accentColorChanged();
 }

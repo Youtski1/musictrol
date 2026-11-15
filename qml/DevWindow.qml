@@ -9,8 +9,7 @@ ApplicationWindow {
     id: win
     width: 560
     height: 720
-    visible: true
-    title: "Musictrol — проверка звука (шаг 1)"
+    title: "Musictrol — поиск (временное окно)"
     color: "#0d0b12"
 
     readonly property color fg: "#f4f1fb"

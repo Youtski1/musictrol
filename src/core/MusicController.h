@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QColor>
 #include <QObject>
+#include <QPointer>
 #include <QtQmlIntegration>
 
 #include "core/Track.h"
@@ -9,6 +11,8 @@
 
 class QQmlEngine;
 class QJSEngine;
+class QNetworkAccessManager;
+class QNetworkReply;
 class YouTubeSearch;
 
 // Центр приложения: поиск, очередь, текущий трек. Один на всё приложение,
@@ -31,6 +35,8 @@ class MusicController : public QObject
     Q_PROPERTY(QString currentArtist READ currentArtist NOTIFY currentChanged)
     Q_PROPERTY(QString currentThumbnail READ currentThumbnail NOTIFY currentChanged)
     Q_PROPERTY(QString currentVideoId READ currentVideoId NOTIFY currentChanged)
+    // Главный цвет обложки — им подсвечиваются виджеты.
+    Q_PROPERTY(QColor accentColor READ accentColor NOTIFY accentColorChanged)
 
 public:
     explicit MusicController(QObject *parent = nullptr);
@@ -52,6 +58,7 @@ public:
     QString currentArtist() const { return m_current.artist; }
     QString currentThumbnail() const { return m_current.thumbnail; }
     QString currentVideoId() const { return m_current.videoId; }
+    QColor accentColor() const { return m_accent; }
 
     Q_INVOKABLE void search(const QString &query);
     Q_INVOKABLE void playResult(int index);   // играть из результатов, очередь = результаты
@@ -67,19 +74,26 @@ signals:
     void searchingChanged();
     void errorTextChanged();
     void currentChanged();
+    void accentColorChanged();
 
 private:
     void setError(const QString &text);
     void playTrack(const Track &track);
+    void fetchAccent(const QString &thumbnailUrl);
+    void setAccent(const QColor &color);
 
     MpvPlayer *m_player = nullptr;
     YouTubeSearch *m_search = nullptr;
     TrackListModel *m_results = nullptr;
     TrackListModel *m_queue = nullptr;
 
+    QNetworkAccessManager *m_net = nullptr;
+    QPointer<QNetworkReply> m_coverReply;
+
     Track m_current;
     int m_currentIndex = -1;
     QString m_errorText;
+    QColor m_accent = QColor(0xff, 0x2a, 0x36);
 
     static MusicController *s_instance;
 };
