@@ -45,6 +45,10 @@ Window {
     readonly property bool interactive: GlobalHotkeys.interactive || previewInteractive
     // Капсула спрятана: в игре и не в интерактивном режиме.
     readonly property bool hidden: gameMode && !interactive
+    // Кружок в углу можно выключить; живая полоса (перемотка, игровой режим) всё равно включается.
+    property bool cornerEnabled: true
+    readonly property bool cornerHidden: !cornerEnabled && !waveMode && !interactive
+    onCornerHiddenChanged: Qt.callLater(updateInput)
     Timer {
         interval: 1000; repeat: true; running: true
         onTriggered: {
@@ -327,6 +331,7 @@ Window {
     height: interactive ? 430 : 150
     visible: true
     onTargetScreenChanged: Qt.callLater(() => WindowHelper.setupWidgetWindow(mini, WindowHelper.Above))
+    onVisibleChanged: if (visible) Qt.callLater(() => { WindowHelper.setupWidgetWindow(mini, WindowHelper.Above); updateInput() })
 
     property color accent: Music.accentColor
     Behavior on accent { ColorAnimation { duration: 700 } }
@@ -353,7 +358,7 @@ Window {
     }
 
     function updateInput() {
-        if (hidden)
+        if (hidden || cornerHidden)
             WindowHelper.setInputRect(mini, 0, 0, 1, 1)   // в игре — клики насквозь
         else
             WindowHelper.setInputRect(mini, cap.x, cap.y, cap.width, cap.height)
@@ -368,7 +373,7 @@ Window {
     // ── Волны вокруг кружка ──────────────────────────────────────────────
     Item {
         id: ripples
-        readonly property bool active: prefs.ripples && !mini.waveMode && !mini.hidden
+        readonly property bool active: prefs.ripples && !mini.waveMode && !mini.hidden && !mini.cornerHidden
                                        && ((Music.hasTrack && !Music.player.paused) || mini.previewRipples)
         x: cap.x + cover.x + cover.width / 2
         y: cap.y + cover.y + cover.height / 2
@@ -428,7 +433,7 @@ Window {
         borderColor: (mini.panelOpen || waveArea.dragging) ? Qt.alpha(mini.accent, 0.65) : Theme.glassBorder
 
         // В покое капсула слегка прозрачная — вписывается в любое окно под ней.
-        opacity: mini.hidden ? 0 : mini.interactive ? 1 : (mini.hoverHold || mini.panelOpen || waveArea.dragging) ? 1 : (mini.waveMode ? 0.82 : 0.7)
+        opacity: (mini.hidden || mini.cornerHidden) ? 0 : mini.interactive ? 1 : (mini.hoverHold || mini.panelOpen || waveArea.dragging) ? 1 : (mini.waveMode ? 0.82 : 0.7)
         Behavior on opacity { NumberAnimation { duration: 300 } }
 
         readonly property real fullWidth: cover.width + cornerRow.implicitWidth + 22

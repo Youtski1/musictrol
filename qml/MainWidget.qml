@@ -19,6 +19,8 @@ Window {
     // Поведение капсулы в играх: "hud" | "hide" | "normal".
     property string gameBehavior: "hud"
     signal gameBehaviorChosen(string behavior)
+    property bool capsuleEnabled: true
+    signal capsuleEnabledChosen(bool enabled)
 
     readonly property int shadowMargin: 40
     readonly property int cardWidth: 380
@@ -418,6 +420,16 @@ Window {
                         checked: AppSettings.autostart
                         accent: win.accent
                         onToggled: AppSettings.autostart = checked
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Капсула в углу"; color: Theme.fg; font.pixelSize: 14; Layout.fillWidth: true }
+                    Toggle {
+                        checked: win.capsuleEnabled
+                        accent: win.accent
+                        onToggled: win.capsuleEnabledChosen(checked)
                     }
                 }
 

@@ -14,9 +14,16 @@ QtObject {
         property string behavior: "hud"
     }
 
+    // Капсулу можно выключить совсем.
+    property Settings capsulePrefs: Settings {
+        category: "CapsuleWindow"
+        property bool enabled: true
+    }
+
     property MiniWidget mini: MiniWidget {
         panelOpen: app.panel.opened
         gameBehavior: app.gamePrefs.behavior
+        cornerEnabled: app.capsulePrefs.enabled
         onTogglePanel: app.panel.toggle(screen)
     }
 
@@ -25,6 +32,8 @@ QtObject {
         onCapsuleRequested: app.mini.setWaveMode(!app.mini.waveMode)
         gameBehavior: app.gamePrefs.behavior
         onGameBehaviorChosen: (b) => app.gamePrefs.behavior = b
+        capsuleEnabled: app.capsulePrefs.enabled
+        onCapsuleEnabledChosen: (on) => app.capsulePrefs.enabled = on
     }
 
     // Глобальные горячие клавиши.
