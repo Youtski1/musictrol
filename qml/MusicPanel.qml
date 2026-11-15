@@ -135,9 +135,19 @@ Window {
     // mqdefault (320×180) → hq720 (1280×720) для крупной обложки в центре.
     function hiRes(url) { return url ? url.toString().replace("mqdefault", "hq720") : "" }
 
+    // Выбранный в карусели трек — тот, что сейчас играет?
+    readonly property bool currentIsPlaying: !playlistGrid && itemCount > 0 && Music.hasTrack
+        && carousel.currentItem && carousel.currentItem.model
+        && (carousel.currentItem.model.videoId ?? "") === Music.currentVideoId
+
     function playCurrent() {
         if (itemCount === 0)
             return
+        // Клик по играющему треку — пауза / продолжить, а не перезапуск.
+        if (currentIsPlaying) {
+            Music.togglePause()
+            return
+        }
         if (playlistGrid) {
             Library.openPlaylist(carousel.currentIndex)
             if (Library.openedTracks.count > 0)
@@ -495,6 +505,23 @@ Window {
                             }
                         }
 
+                        // Играющий трек: значок паузы/игры поверх обложки
+                        Rectangle {
+                            readonly property bool playingThis: !tile.isPlaylist && Music.hasTrack
+                                                                && (tile.model.videoId ?? "") === Music.currentVideoId
+                            visible: playingThis && tile.isCurrent
+                            anchors.centerIn: parent
+                            width: 56; height: 56; radius: 28
+                            color: Qt.rgba(0, 0, 0, 0.5)
+                            Icon {
+                                anchors.centerIn: parent
+                                name: Music.player.paused ? "play" : "pause"
+                                size: 24
+                                strokeWidth: 2.5
+                                color: "white"
+                            }
+                        }
+
                         // Обводка и свечение у центральной
                         Rectangle {
                             anchors.fill: parent
@@ -596,7 +623,9 @@ Window {
                 visible: overlay.itemCount > 0
 
                 PillButton {
-                    text: overlay.playlistGrid ? "Играть всё" : "Играть"
+                    text: overlay.playlistGrid ? "Играть всё"
+                          : overlay.currentIsPlaying ? (Music.player.paused ? "Продолжить" : "Пауза")
+                          : "Играть"
                     primary: true
                     onClicked: overlay.playCurrent()
                 }

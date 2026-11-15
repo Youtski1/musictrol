@@ -480,6 +480,19 @@ bool GlobalHotkeys::nativeEventFilter(const QByteArray &eventType, void *message
     if (m_interactive && (type == XCB_KEY_PRESS || type == XCB_KEY_RELEASE)) {
         if (type == XCB_KEY_PRESS) {
             auto *k = reinterpret_cast<xcb_key_press_event_t *>(ev);
+            // Назначенные сочетания работают и внутри полосы; «Открыть музыку» — закрывает её.
+            const quint16 st = k->state & kRelevantMods;
+            for (const Action &a : m_actions) {
+                if (a.keycode && a.keycode == k->detail && a.mods == st) {
+                    const QString id = a.id;
+                    if (id == QLatin1String("panel"))
+                        QMetaObject::invokeMethod(this, &GlobalHotkeys::endInteractive, Qt::QueuedConnection);
+                    else
+                        QMetaObject::invokeMethod(this, [this, id] { emit triggered(id); }, Qt::QueuedConnection);
+                    m_idleTimer.start();
+                    return true;
+                }
+            }
             handleInteractiveKey(k->detail, k->state);
         }
         return true;
