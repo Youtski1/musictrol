@@ -29,6 +29,10 @@ QtObject {
 
     property MainWidget mainWidget: MainWidget {
         onSearchRequested: app.panel.open(app.mini.screen)
+        onDownloadsRequested: {
+            app.panel.open(app.mini.screen)
+            app.panel.setSection(app.panel.secDownloads)
+        }
         onCapsuleRequested: app.mini.setWaveMode(!app.mini.waveMode)
         gameBehavior: app.gamePrefs.behavior
         onGameBehaviorChosen: (b) => app.gamePrefs.behavior = b

@@ -724,6 +724,15 @@ Window {
                 }
             }
 
+            // Текст песни под играющим треком — идёт вместе с музыкой.
+            LyricsView {
+                Layout.fillWidth: true
+                Layout.leftMargin: 30
+                Layout.rightMargin: 30
+                visible: overlay.currentIsPlaying
+                accent: overlay.accent
+            }
+
             Label {
                 Layout.alignment: Qt.AlignHCenter
                 visible: Music.errorText.length > 0

@@ -16,6 +16,7 @@ Window {
     signal searchRequested()
     signal capsuleRequested()
     signal karaokeRequested()
+    signal downloadsRequested()   // клик по обложке — скачанная музыка
     // Поведение капсулы в играх: "hud" | "hide" | "normal".
     property string gameBehavior: "hud"
     signal gameBehaviorChosen(string behavior)
@@ -172,6 +173,8 @@ Window {
                             radius: 12
                             source: Music.currentThumbnail
                         }
+                        TapHandler { onTapped: win.downloadsRequested() }
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
                     }
 
                     ColumnLayout {

@@ -25,6 +25,8 @@ qt_add_executable(musictrol
     src/core/Library.cpp
     src/core/Downloads.h
     src/core/Downloads.cpp
+    src/core/Lyrics.h
+    src/core/Lyrics.cpp
     src/player/MpvPlayer.h
     src/player/MpvPlayer.cpp
     src/youtube/YouTubeSearch.h
@@ -57,6 +59,7 @@ qt_add_qml_module(musictrol
         qml/components/VolumePill.qml
         qml/components/WaveSeek.qml
         qml/components/KeyChip.qml
+        qml/components/LyricsView.qml
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml
