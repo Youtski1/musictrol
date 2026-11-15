@@ -245,6 +245,29 @@ Window {
         function onFailed(message) { overlay.showToast(message) }
     }
 
+    // Карусель следует за музыкой: переключился трек — встаём на него.
+    function followCurrent() {
+        if (!Music.hasTrack || playlistGrid || !currentModel)
+            return
+        const i = section === secQueue ? Music.currentIndex : currentModel.indexOfVideo(Music.currentVideoId)
+        if (i >= 0 && i !== carousel.currentIndex)
+            carousel.currentIndex = i
+    }
+    Connections {
+        target: Music
+        function onCurrentChanged() { overlay.followCurrent() }
+    }
+
+    function wheelVolume(e) {
+        const d = e.angleDelta.y !== 0 ? e.angleDelta.y : e.angleDelta.x
+        if (d === 0)
+            return
+        Music.player.muted = false
+        Music.player.volume = Math.max(0, Math.min(100, Music.player.volume + d / 120 * 5))
+        volumeBadge.opacity = 1
+        volumeBadgeTimer.restart()
+    }
+
     function showToast(text) {
         toast.text = text
         toast.opacity = 1
@@ -286,6 +309,8 @@ Window {
         // Клики по панели не должны закрывать её.
         MouseArea { anchors.fill: parent }
         HoverHandler { id: panelHover }
+        // Колесо над панелью (кроме ряда обложек — там листает карусель) — громкость.
+        WheelHandler { onWheel: (e) => overlay.wheelVolume(e) }
 
         ColumnLayout {
             id: content
@@ -846,6 +871,39 @@ Window {
         }
     }
 
+    // Значок громкости над панелью при прокрутке колеса.
+    Rectangle {
+        id: volumeBadge
+        x: panel.x + (panel.width - width) / 2
+        y: panel.y - height - 12
+        width: volRow.implicitWidth + 28
+        height: 36
+        radius: 18
+        color: Qt.rgba(0.07, 0.05, 0.1, 0.95)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.14)
+        opacity: 0
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Timer { id: volumeBadgeTimer; interval: 1100; onTriggered: volumeBadge.opacity = 0 }
+        Row {
+            id: volRow
+            anchors.centerIn: parent
+            spacing: 10
+            Icon { name: Music.player.volume > 0 ? "volume" : "mute"; size: 17; color: Theme.fg; anchors.verticalCenter: parent.verticalCenter }
+            GlassSlider {
+                width: 120
+                anchors.verticalCenter: parent.verticalCenter
+                from: 0; to: 100
+                value: Music.player.volume
+                smoothing: 80
+                accent: overlay.accent
+                enabled: false
+            }
+            Label { text: Math.round(Music.player.volume) + "%"; color: Theme.fg; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
+        }
+    }
+
     // ── Живая полоса под меню (игровой режим) ────────────────────────────
     Rectangle {
         id: liveStrip
@@ -862,6 +920,7 @@ Window {
         scale: panel.scale
 
         MouseArea { anchors.fill: parent }   // клики по полосе не закрывают меню
+        WheelHandler { onWheel: (e) => overlay.wheelVolume(e) }
 
         RoundedImage {
             id: stripCover

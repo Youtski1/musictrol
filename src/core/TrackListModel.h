@@ -39,7 +39,7 @@ public:
     void append(const Track &track);
     void prepend(const Track &track);
     void removeAt(int row);
-    int indexOfVideo(const QString &videoId) const;
+    Q_INVOKABLE int indexOfVideo(const QString &videoId) const;
 
 signals:
     void countChanged();
