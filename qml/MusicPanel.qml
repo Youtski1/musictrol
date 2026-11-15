@@ -19,6 +19,7 @@ Window {
     readonly property int secPlaylists: 2
     readonly property int secFavorites: 3
     readonly property int secHistory: 4
+    readonly property int secDownloads: 5
     property int section: secSearch
 
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
@@ -87,6 +88,7 @@ Window {
         case secPlaylists: return Library.openedPlaylist >= 0 ? Library.openedTracks : Library.playlists
         case secFavorites: return Library.favorites
         case secHistory: return Library.history
+        case secDownloads: return Downloads.tracks
         default: return Music.results
         }
     }
@@ -115,6 +117,7 @@ Window {
                                                : "Плейлисты · " + itemCount
         case secFavorites: return "Избранное · " + tracksText(itemCount)
         case secHistory: return "История · " + tracksText(itemCount)
+        case secDownloads: return "Скачанное · " + tracksText(itemCount)
         default:
             if (Music.searching) return "Ищу…"
             return itemCount > 0 ? "Поиск · " + itemCount + " " + plural(itemCount, "результат", "результата", "результатов") : "Поиск"
@@ -128,6 +131,7 @@ Window {
                                                                : "Плейлистов пока нет — создайте первый"
         case secFavorites: return "Нажмите ♥ у трека, чтобы добавить его сюда"
         case secHistory: return "Здесь появятся сыгранные треки"
+        case secDownloads: return "Скачайте трек кнопкой ↓ — он будет играть и без интернета"
         default: return Music.searching ? "" : "Введите запрос или ссылку и нажмите Enter"
         }
     }
@@ -155,6 +159,12 @@ Window {
             return
         }
         Music.playFrom(currentModel, carousel.currentIndex)
+    }
+
+    Connections {
+        target: Downloads
+        function onFinished(title) { overlay.showToast("Скачано: " + title) }
+        function onFailed(message) { overlay.showToast(message) }
     }
 
     function showToast(text) {
@@ -260,7 +270,8 @@ Window {
                                 { icon: "queue", tip: "Очередь" },
                                 { icon: "playlists", tip: "Плейлисты" },
                                 { icon: "heart", tip: "Избранное" },
-                                { icon: "history", tip: "История" }
+                                { icon: "history", tip: "История" },
+                                { icon: "download", tip: "Скачанное" }
                             ]
                             delegate: IconButton {
                                 required property var modelData
@@ -571,7 +582,7 @@ Window {
                     visible: overlay.itemCount === 0
                     Icon {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        name: ["search", "queue", "playlists", "heart", "history"][overlay.section]
+                        name: ["search", "queue", "playlists", "heart", "history", "download"][overlay.section]
                         size: 34
                         color: Qt.rgba(1, 1, 1, 0.25)
                         visible: !Music.searching || overlay.section !== overlay.secSearch
@@ -659,12 +670,41 @@ Window {
                     baseColor: Qt.rgba(1, 1, 1, 0.1)
                     onClicked: Library.toggleFavorite(overlay.currentModel, carousel.currentIndex)
                 }
-                // Убрать из очереди / плейлиста, удалить плейлист
+                // Скачать: ↓ → проценты → галочка
+                IconButton {
+                    id: dlBtn
+                    visible: !overlay.playlistGrid && overlay.section !== overlay.secDownloads
+                    readonly property string vid: carousel.currentItem && carousel.currentItem.model ? (carousel.currentItem.model.videoId ?? "") : ""
+                    readonly property bool done: Downloads.revision >= 0 && Downloads.isDownloaded(vid)
+                    readonly property var pct: Downloads.progress[vid]
+                    readonly property bool busy: pct !== undefined
+                    iconName: done ? "check" : "download"
+                    text: done ? "Уже скачано" : busy ? "Скачивается…" : "Скачать"
+                    implicitWidth: busy ? 56 : 40; implicitHeight: 40
+                    iconSize: 18
+                    iconColor: done ? Qt.lighter(overlay.accent, 1.3) : Theme.fg
+                    baseColor: Qt.rgba(1, 1, 1, 0.1)
+                    enabled: !done && !busy
+                    onClicked: Downloads.download(overlay.currentModel, carousel.currentIndex)
+                    Text {
+                        visible: dlBtn.busy
+                        anchors.centerIn: parent
+                        text: (dlBtn.pct ?? 0) + "%"
+                        color: "white"
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
+                    }
+                    Component.onCompleted: contentItem.visible = Qt.binding(() => !dlBtn.busy)
+                }
+
+                // Убрать из очереди / плейлиста, удалить плейлист или скачанное
                 IconButton {
                     visible: overlay.section === overlay.secQueue
+                             || overlay.section === overlay.secDownloads
                              || (overlay.section === overlay.secPlaylists)
                     iconName: "trash"
                     text: overlay.playlistGrid ? "Удалить плейлист"
+                          : overlay.section === overlay.secDownloads ? "Удалить с диска"
                           : overlay.section === overlay.secQueue ? "Убрать из очереди" : "Убрать из плейлиста"
                     implicitWidth: 40; implicitHeight: 40
                     iconSize: 17
@@ -674,6 +714,8 @@ Window {
                         const i = carousel.currentIndex
                         if (overlay.playlistGrid)
                             Library.deletePlaylist(i)
+                        else if (overlay.section === overlay.secDownloads)
+                            Downloads.remove(i)
                         else if (overlay.section === overlay.secQueue)
                             Music.removeFromQueue(i)
                         else

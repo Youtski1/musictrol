@@ -23,6 +23,8 @@ qt_add_executable(musictrol
     src/core/AppSettings.cpp
     src/core/Library.h
     src/core/Library.cpp
+    src/core/Downloads.h
+    src/core/Downloads.cpp
     src/player/MpvPlayer.h
     src/player/MpvPlayer.cpp
     src/youtube/YouTubeSearch.h

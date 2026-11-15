@@ -7,6 +7,7 @@
 #include <clocale>
 
 #include "core/AppSettings.h"
+#include "core/Downloads.h"
 #include "core/Library.h"
 #include "core/MusicController.h"
 #include "desktop/GlobalHotkeys.h"
@@ -55,6 +56,8 @@ int main(int argc, char *argv[])
     AppSettings::setInstance(&settings);
     Library library;
     Library::setInstance(&library);
+    Downloads downloads;
+    Downloads::setInstance(&downloads);
     MusicController controller;
     MusicController::setInstance(&controller);
     QObject::connect(&controller, &MusicController::trackStarted, &library, &Library::addToHistory);

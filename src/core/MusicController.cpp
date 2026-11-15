@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "youtube/YouTubeSearch.h"
+#include "core/Downloads.h"
 
 MusicController *MusicController::s_instance = nullptr;
 
@@ -182,7 +183,14 @@ void MusicController::playTrack(const Track &track)
 {
     m_current = track;
     clearError();
-    m_player->load(track.url);
+    // Уже скачан — играем с диска (быстрее и без интернета).
+    QString source = track.url;
+    if (Downloads *d = Downloads::instance()) {
+        const QString local = d->localPath(track.videoId);
+        if (!local.isEmpty())
+            source = local;
+    }
+    m_player->load(source);
     emit currentChanged();
     emit trackStarted(track);
     fetchAccent(track.thumbnail);
