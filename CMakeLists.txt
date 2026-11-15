@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 Network Concurrent)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
-pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb xcb-shape xcb-keysyms)
+pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb xcb-shape xcb-keysyms xkbcommon xkbcommon-x11)
 
 qt_standard_project_setup(REQUIRES 6.9)
 

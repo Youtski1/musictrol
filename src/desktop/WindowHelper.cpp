@@ -79,6 +79,33 @@ void WindowHelper::startMove(QWindow *window)
         window->startSystemMove();
 }
 
+bool WindowHelper::activeWindowFullscreen() const
+{
+    xcb_connection_t *c = x11Connection();
+    if (!c)
+        return false;
+    const xcb_window_t root = xcb_setup_roots_iterator(xcb_get_setup(c)).data->root;
+    xcb_get_property_reply_t *act = xcb_get_property_reply(
+        c, xcb_get_property(c, 0, root, atom(c, "_NET_ACTIVE_WINDOW"), XCB_ATOM_WINDOW, 0, 1), nullptr);
+    if (!act)
+        return false;
+    const xcb_window_t win = xcb_get_property_value_length(act) == 4 ? *static_cast<xcb_window_t *>(xcb_get_property_value(act)) : 0;
+    free(act);
+    if (!win)
+        return false;
+    const xcb_atom_t full = atom(c, "_NET_WM_STATE_FULLSCREEN");
+    xcb_get_property_reply_t *st = xcb_get_property_reply(
+        c, xcb_get_property(c, 0, win, atom(c, "_NET_WM_STATE"), XCB_ATOM_ATOM, 0, 32), nullptr);
+    bool result = false;
+    if (st) {
+        const auto *a = static_cast<xcb_atom_t *>(xcb_get_property_value(st));
+        for (int i = 0; i < xcb_get_property_value_length(st) / 4; ++i)
+            result = result || a[i] == full;
+        free(st);
+    }
+    return result;
+}
+
 void WindowHelper::setInputRect(QWindow *window, qreal x, qreal y, qreal width, qreal height)
 {
     xcb_connection_t *c = x11Connection();

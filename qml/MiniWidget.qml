@@ -31,14 +31,300 @@ Window {
         return list.length > 0 ? list[0] : null
     }
 
-    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    // Не забирает фокус: игра не выпадает из полноэкранного режима, панель задач не вылезает.
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
     color: "transparent"
     title: "Musictrol capsule"
+
+    // Игровой режим. Поведение в играх (настройка): "hud" — HUD сквозь клики,
+    // "hide" — прятать полностью, "normal" — как обычно.
+    property string gameBehavior: "hud"
+    property bool fullscreenActive: false
+    readonly property bool gameMode: fullscreenActive && gameBehavior !== "normal"
+    property bool previewInteractive: false   // только для снимков разработчика
+    readonly property bool interactive: GlobalHotkeys.interactive || previewInteractive
+    // Капсула спрятана: в игре и не в интерактивном режиме.
+    readonly property bool hidden: gameMode && !interactive
+    Timer {
+        interval: 1000; repeat: true; running: true
+        onTriggered: {
+            mini.fullscreenActive = WindowHelper.activeWindowFullscreen() && !mini.panelOpen
+            if (!mini.fullscreenActive && mini.interactive)
+                GlobalHotkeys.endInteractive()
+        }
+    }
+    onHiddenChanged: Qt.callLater(updateInput)
+
+    // ── Интерактивный режим (клавиатура у нас, игра остаётся активной) ────
+    property bool savedWaveMode: false
+    property string query: ""
+    property string lastQuery: ""
+    property int resultIndex: 0
+    readonly property bool searching: query.length > 0
+
+    onInteractiveChanged: {
+        if (interactive) {
+            savedWaveMode = waveMode
+            waveMode = true
+            query = ""
+            lastQuery = ""
+        } else {
+            waveMode = savedWaveMode
+        }
+        Qt.callLater(updateInput)
+    }
+
+    // Начать управление полосой из игры. false — клавиатуру забрать не удалось.
+    function enterInteractive() { return GlobalHotkeys.beginInteractive() }
+
+    function handleGameKey(key, text) {
+        switch (key) {
+        case "SuperKey":
+            GlobalHotkeys.endInteractive()
+            return
+        case "Escape":
+            if (searching) query = ""
+            else GlobalHotkeys.endInteractive()
+            return
+        case "Return":
+        case "KP_Enter":
+            if (!searching)
+                return
+            if (query !== lastQuery) {
+                lastQuery = query
+                resultIndex = 0
+                Music.search(query)
+            } else if (Music.results.count > 0) {
+                Music.playFrom(Music.results, resultIndex)
+                query = ""
+                lastQuery = ""
+            }
+            return
+        case "BackSpace":
+            if (searching) query = query.slice(0, -1)
+            return
+        case "Left":
+            if (searching) resultIndex = Math.max(0, resultIndex - 1)
+            else Music.player.seek(Math.max(0, Music.player.position - 5))
+            return
+        case "Right":
+            if (searching) resultIndex = Math.min(Math.max(0, Music.results.count - 1), resultIndex + 1)
+            else Music.player.seek(Music.player.position + 5)
+            return
+        case "Up":
+            Music.player.muted = false
+            Music.player.volume = Math.min(100, Music.player.volume + 5)
+            return
+        case "Down":
+            Music.player.volume = Math.max(0, Music.player.volume - 5)
+            return
+        case "Prior":
+            Music.previous()
+            return
+        case "Next":
+            Music.next()
+            return
+        case "space":
+            if (!searching) {
+                Music.togglePause()
+                return
+            }
+            break
+        }
+        if (text.length > 0)
+            query += text
+    }
+
+    Connections {
+        target: GlobalHotkeys
+        function onInteractiveKey(key, text) { mini.handleGameKey(key, text) }
+    }
+
+    // Подсказки и поиск под полосой
+    Column {
+        id: gameUi
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: cap.y + cap.height + 12
+        spacing: 12
+        opacity: mini.interactive ? 1 : 0
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 220 } }
+
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 6
+            Repeater {
+                model: mini.searching
+                       ? ["← → выбрать", "Enter — найти / играть", "Backspace — стереть", "Esc — очистить"]
+                       : ["← → перемотка", "↑ ↓ громкость", "Пробел — пауза", "PgUp / PgDn — трек", "печатай — поиск", "Esc — в игру"]
+                delegate: Rectangle {
+                    required property string modelData
+                    width: hint.implicitWidth + 18
+                    height: 24
+                    radius: 8
+                    color: Qt.rgba(0.07, 0.05, 0.1, 0.85)
+                    border.color: Qt.rgba(1, 1, 1, 0.1)
+                    Text { id: hint; anchors.centerIn: parent; text: parent.modelData; color: Theme.dim; font.pixelSize: 12 }
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: mini.searching
+            width: 540
+            height: searchCol.implicitHeight + 20
+            radius: 26
+            color: Qt.rgba(0.085, 0.063, 0.118, 0.95)
+            border.color: Qt.rgba(1, 1, 1, 0.14)
+
+            Column {
+                id: searchCol
+                anchors.centerIn: parent
+                width: parent.width - 20
+                spacing: 10
+
+                Rectangle {
+                    width: parent.width
+                    height: 44
+                    radius: 22
+                    color: Qt.rgba(1, 1, 1, 0.08)
+                    border.color: Qt.alpha(mini.accent, 0.5)
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 16
+                        spacing: 10
+                        Icon { name: "search"; size: 17; color: Qt.lighter(mini.accent, 1.3); anchors.verticalCenter: parent.verticalCenter }
+                        Text {
+                            text: mini.query + "▍"
+                            color: "white"
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Music.searching ? "ищу…" : (mini.query !== mini.lastQuery ? "Enter — найти" : "")
+                        color: Theme.faint
+                        font.pixelSize: 12
+                    }
+                }
+
+                // Результаты: выбранная обложка крупнее
+                ListView {
+                    id: gameResults
+                    visible: Music.results.count > 0 && mini.lastQuery.length > 0
+                    width: parent.width
+                    height: visible ? 100 : 0
+                    orientation: ListView.Horizontal
+                    clip: true
+                    spacing: 10
+                    interactive: false
+                    model: Music.results
+                    currentIndex: mini.resultIndex
+                    highlightRangeMode: ListView.ApplyRange
+                    preferredHighlightBegin: width / 2 - 50
+                    preferredHighlightEnd: width / 2 + 50
+                    highlightMoveDuration: 250
+                    delegate: Item {
+                        required property int index
+                        required property string thumbnail
+                        readonly property bool current: index === mini.resultIndex
+                        width: current ? 100 : 72
+                        height: 100
+                        Behavior on width { NumberAnimation { duration: 200 } }
+                        RoundedImage {
+                            anchors.centerIn: parent
+                            width: parent.width
+                            height: parent.current ? 100 : 72
+                            radius: 12
+                            source: parent.thumbnail
+                            opacity: parent.current ? 1 : 0.5
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width
+                            height: parent.current ? 100 : 72
+                            radius: 12
+                            color: "transparent"
+                            border.width: parent.current ? 2 : 0
+                            border.color: "white"
+                        }
+                    }
+                }
+
+                Text {
+                    visible: gameResults.visible
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                    text: Music.results.count >= 0 ? Music.results.titleAt(mini.resultIndex) : ""
+                    color: "white"
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                }
+            }
+        }
+    }
+
+    // HUD: живые волны + название, клики проходят насквозь.
+    Rectangle {
+        id: hud
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 8
+        width: hudRow.implicitWidth + 24
+        height: 32
+        radius: 16
+        color: Qt.rgba(0.05, 0.04, 0.08, 0.6)
+        border.color: Qt.rgba(1, 1, 1, 0.12)
+        opacity: mini.hidden && mini.gameBehavior === "hud" && Music.hasTrack ? 0.85 : 0
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 300 } }
+        Row {
+            id: hudRow
+            anchors.centerIn: parent
+            spacing: 10
+            WaveSeek {
+                width: 90; height: 18
+                anchors.verticalCenter: parent.verticalCenter
+                seed: Music.currentVideoId; accent: mini.accent
+                playing: !Music.player.paused
+                position: Music.player.position; duration: Music.player.duration
+                enabled: false
+            }
+            Label {
+                text: Music.currentTitle; color: Theme.fg; font.pixelSize: 12
+                width: Math.min(implicitWidth, 260); elide: Text.ElideRight
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
+    // Шкала громкости под HUD при изменении громкости.
+    Rectangle {
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 48; width: 220; height: 30; radius: 15
+        color: Qt.rgba(0.05, 0.04, 0.08, 0.8)
+        opacity: 0
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Connections {
+            target: Music.player
+            function onVolumeChanged() { if (mini.hidden && mini.gameBehavior === "hud") { parent.opacity = 1; volHide.restart() } }
+        }
+        Timer { id: volHide; interval: 1300; onTriggered: parent.opacity = 0 }
+        GlassSlider {
+            anchors.fill: parent; anchors.margins: 12
+            from: 0; to: 100; value: Music.player.volume; enabled: false; accent: mini.accent
+        }
+    }
     screen: targetScreen
     x: targetScreen ? targetScreen.virtualX : 0
     y: targetScreen ? targetScreen.virtualY : 0
     width: targetScreen ? targetScreen.width : 1280
-    height: 150
+    height: interactive ? 430 : 150
     visible: true
     onTargetScreenChanged: Qt.callLater(() => WindowHelper.setupWidgetWindow(mini, WindowHelper.Above))
 
@@ -67,7 +353,10 @@ Window {
     }
 
     function updateInput() {
-        WindowHelper.setInputRect(mini, cap.x, cap.y, cap.width, cap.height)
+        if (hidden)
+            WindowHelper.setInputRect(mini, 0, 0, 1, 1)   // в игре — клики насквозь
+        else
+            WindowHelper.setInputRect(mini, cap.x, cap.y, cap.width, cap.height)
     }
 
     function setWaveMode(on) { waveMode = on }
@@ -79,7 +368,7 @@ Window {
     // ── Волны вокруг кружка ──────────────────────────────────────────────
     Item {
         id: ripples
-        readonly property bool active: prefs.ripples && !mini.waveMode
+        readonly property bool active: prefs.ripples && !mini.waveMode && !mini.hidden
                                        && ((Music.hasTrack && !Music.player.paused) || mini.previewRipples)
         x: cap.x + cover.x + cover.width / 2
         y: cap.y + cover.y + cover.height / 2
@@ -139,7 +428,7 @@ Window {
         borderColor: (mini.panelOpen || waveArea.dragging) ? Qt.alpha(mini.accent, 0.65) : Theme.glassBorder
 
         // В покое капсула слегка прозрачная — вписывается в любое окно под ней.
-        opacity: (mini.hoverHold || mini.panelOpen || waveArea.dragging) ? 1 : (mini.waveMode ? 0.82 : 0.7)
+        opacity: mini.hidden ? 0 : mini.interactive ? 1 : (mini.hoverHold || mini.panelOpen || waveArea.dragging) ? 1 : (mini.waveMode ? 0.82 : 0.7)
         Behavior on opacity { NumberAnimation { duration: 300 } }
 
         readonly property real fullWidth: cover.width + cornerRow.implicitWidth + 22

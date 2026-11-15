@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import Musictrol
 
 // Корень приложения: держит все окна-виджеты и связывает их.
@@ -7,14 +8,23 @@ QtObject {
 
     property MusicPanel panel: MusicPanel {}
 
+    // Поведение капсулы в играх: "hud" | "hide" | "normal".
+    property Settings gamePrefs: Settings {
+        category: "Game"
+        property string behavior: "hud"
+    }
+
     property MiniWidget mini: MiniWidget {
         panelOpen: app.panel.opened
+        gameBehavior: app.gamePrefs.behavior
         onTogglePanel: app.panel.toggle(screen)
     }
 
     property MainWidget mainWidget: MainWidget {
         onSearchRequested: app.panel.open(app.mini.screen)
         onCapsuleRequested: app.mini.setWaveMode(!app.mini.waveMode)
+        gameBehavior: app.gamePrefs.behavior
+        onGameBehaviorChosen: (b) => app.gamePrefs.behavior = b
     }
 
     // Глобальные горячие клавиши.
@@ -22,7 +32,16 @@ QtObject {
         target: GlobalHotkeys
         function onTriggered(id) {
             switch (id) {
-            case "panel": app.panel.toggle(app.mini.screen); break
+            case "panel":
+                // В игре — живая полоса с клавиатуры (игра остаётся активной),
+                // иначе — панель музыки.
+                if (app.mini.gameMode) {
+                    if (!app.mini.enterInteractive())
+                        app.mini.setWaveMode(!app.mini.waveMode)
+                } else {
+                    app.panel.toggle(app.mini.screen)
+                }
+                break
             case "playPause": Music.togglePause(); break
             case "next": Music.next(); break
             case "prev": Music.previous(); break
@@ -75,10 +94,23 @@ QtObject {
                 () => {
                     save(app.mini, "capsule-wave")
                     app.mini.setWaveMode(false)
+                    app.mini.previewInteractive = true
+                    interval = 1200
+                },
+                () => {
+                    save(app.mini, "game-interactive")
+                    app.mini.query = "дора"
+                    app.mini.lastQuery = "дора"
+                    Music.search("дора")
+                    interval = 6000
+                },
+                () => {
+                    save(app.mini, "game-search")
                     app.panel.open(app.mini.screen)
                     interval = 1200
                 },
                 () => {
+                    app.mini.previewInteractive = false
                     app.panel.contentItem.grabToImage(r => { r.saveToFile(dir + "/panel.png"); Qt.quit() })
                     stop()
                 }

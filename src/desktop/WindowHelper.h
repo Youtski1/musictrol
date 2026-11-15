@@ -19,6 +19,8 @@ public:
 
     // Главный виджет: под всеми окнами, на всех рабочих столах, не в панели задач.
     Q_INVOKABLE void setupWidgetWindow(QWindow *window, WindowHelper::Layer layer);
+    // Активное окно развёрнуто на весь экран (игра, видео)?
+    Q_INVOKABLE bool activeWindowFullscreen() const;
     // Перетаскивание окна без рамки средствами оконного менеджера.
     Q_INVOKABLE void startMove(QWindow *window);
     // Клики принимает только этот прямоугольник окна (остальное — «сквозное»).

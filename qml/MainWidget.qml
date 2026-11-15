@@ -16,6 +16,9 @@ Window {
     signal searchRequested()
     signal capsuleRequested()
     signal karaokeRequested()
+    // Поведение капсулы в играх: "hud" | "hide" | "normal".
+    property string gameBehavior: "hud"
+    signal gameBehaviorChosen(string behavior)
 
     readonly property int shadowMargin: 40
     readonly property int cardWidth: 380
@@ -432,6 +435,19 @@ Window {
                         checked: AppSettings.autostart
                         accent: win.accent
                         onToggled: AppSettings.autostart = checked
+                    }
+                }
+
+                // Капсула в играх (полноэкранных программах): клик перебирает варианты.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Капсула в играх"; color: Theme.fg; font.pixelSize: 14; Layout.fillWidth: true }
+                    PillButton {
+                        implicitHeight: 30
+                        readonly property var order: ["hud", "hide", "normal"]
+                        readonly property var names: ({ "hud": "HUD сквозь клики", "hide": "Прятать", "normal": "Как обычно" })
+                        text: names[win.gameBehavior] ?? "HUD сквозь клики"
+                        onClicked: win.gameBehaviorChosen(order[(order.indexOf(win.gameBehavior) + 1) % order.length])
                     }
                 }
 

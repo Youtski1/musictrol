@@ -10,6 +10,8 @@
 
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
+#include <xkbcommon/xkbcommon.h>
+#include <xkbcommon/xkbcommon-x11.h>
 
 namespace {
 
@@ -121,10 +123,16 @@ GlobalHotkeys::GlobalHotkeys(QObject *parent)
     load();
     qApp->installNativeEventFilter(this);
     grabAll();
+
+    m_idleTimer.setSingleShot(true);
+    m_idleTimer.setInterval(30000);
+    connect(&m_idleTimer, &QTimer::timeout, this, &GlobalHotkeys::endInteractive);
 }
 
 GlobalHotkeys::~GlobalHotkeys()
 {
+    endInteractive();
+    resetXkb();
     qApp->removeNativeEventFilter(this);
     ungrabAll();
     if (s_instance == this)
@@ -319,12 +327,111 @@ void GlobalHotkeys::ungrab(const Action &a)
     xcb_flush(c);
 }
 
+void GlobalHotkeys::resetXkb()
+{
+    if (m_xkbState) xkb_state_unref(m_xkbState);
+    if (m_keymap) xkb_keymap_unref(m_keymap);
+    if (m_xkbCtx) xkb_context_unref(m_xkbCtx);
+    m_xkbState = nullptr;
+    m_keymap = nullptr;
+    m_xkbCtx = nullptr;
+}
+
+bool GlobalHotkeys::beginInteractive()
+{
+    if (m_interactive)
+        return true;
+    xcb_connection_t *c = x11Connection();
+    if (!c)
+        return false;
+
+    // Раскладки читаем заново — вдруг пользователь их менял.
+    resetXkb();
+    if (xkb_x11_setup_xkb_extension(c, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
+                                    XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, nullptr, nullptr, nullptr, nullptr)) {
+        m_xkbCtx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        const int32_t dev = xkb_x11_get_core_keyboard_device_id(c);
+        if (m_xkbCtx && dev >= 0)
+            m_keymap = xkb_x11_keymap_new_from_device(m_xkbCtx, c, dev, XKB_KEYMAP_COMPILE_NO_FLAGS);
+        if (m_keymap)
+            m_xkbState = xkb_state_new(m_keymap);
+    }
+    if (!m_xkbState) {
+        resetXkb();
+        return false;
+    }
+
+    xcb_grab_keyboard_reply_t *r = xcb_grab_keyboard_reply(
+        c, xcb_grab_keyboard(c, 1, rootWindow(c), XCB_CURRENT_TIME, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC), nullptr);
+    const bool ok = r && r->status == XCB_GRAB_STATUS_SUCCESS;
+    free(r);
+    if (!ok)
+        return false;
+
+    m_interactive = true;
+    m_idleTimer.start();
+    emit interactiveChanged();
+    return true;
+}
+
+void GlobalHotkeys::endInteractive()
+{
+    if (!m_interactive)
+        return;
+    if (xcb_connection_t *c = x11Connection()) {
+        xcb_ungrab_keyboard(c, XCB_CURRENT_TIME);
+        xcb_flush(c);
+    }
+    m_interactive = false;
+    m_idleTimer.stop();
+    emit interactiveChanged();
+}
+
+void GlobalHotkeys::handleInteractiveKey(quint8 keycode, quint16 state)
+{
+    m_idleTimer.start();
+    // Модификаторы X → xkb (Caps Lock — «зафиксированный»), группа раскладки — биты 13–14.
+    const quint32 mods = state & 0xff;
+    const xkb_layout_index_t group = (state >> 13) & 3;
+    xkb_state_update_mask(m_xkbState, mods & ~XCB_MOD_MASK_LOCK, 0, mods & XCB_MOD_MASK_LOCK, 0, 0, group);
+
+    const xkb_keysym_t sym = xkb_state_key_get_one_sym(m_xkbState, keycode);
+    char name[64] = {0};
+    xkb_keysym_get_name(sym, name, sizeof name);
+
+    QString key = QString::fromLatin1(name);
+    QString text;
+    if (state & XCB_MOD_MASK_4) {
+        key = QStringLiteral("SuperKey"); // Super+что-угодно — выйти из режима
+    } else if (!(state & XCB_MOD_MASK_CONTROL)) {
+        char buf[16] = {0};
+        const int n = xkb_state_key_get_utf8(m_xkbState, keycode, buf, sizeof buf);
+        if (n > 0) {
+            text = QString::fromUtf8(buf, n);
+            if (!text.at(0).isPrint())
+                text.clear();
+        }
+    }
+    QMetaObject::invokeMethod(this, [this, key, text] { emit interactiveKey(key, text); }, Qt::QueuedConnection);
+}
+
 bool GlobalHotkeys::nativeEventFilter(const QByteArray &eventType, void *message, qintptr *)
 {
-    if (eventType != "xcb_generic_event_t" || m_suspended)
+    if (eventType != "xcb_generic_event_t")
         return false;
     auto *ev = static_cast<xcb_generic_event_t *>(message);
-    if ((ev->response_type & ~0x80) != XCB_KEY_PRESS)
+    const quint8 type = ev->response_type & ~0x80;
+
+    // Интерактивный режим: все клавиши — нам.
+    if (m_interactive && (type == XCB_KEY_PRESS || type == XCB_KEY_RELEASE)) {
+        if (type == XCB_KEY_PRESS) {
+            auto *k = reinterpret_cast<xcb_key_press_event_t *>(ev);
+            handleInteractiveKey(k->detail, k->state);
+        }
+        return true;
+    }
+
+    if (m_suspended || type != XCB_KEY_PRESS)
         return false;
 
     auto *k = reinterpret_cast<xcb_key_press_event_t *>(ev);

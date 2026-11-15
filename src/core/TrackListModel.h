@@ -32,6 +32,7 @@ public:
     int count() const { return int(m_tracks.size()); }
     const TrackList &tracks() const { return m_tracks; }
     Track at(int row) const;
+    Q_INVOKABLE QString titleAt(int row) const { return at(row).title; }
 
     void setTracks(const TrackList &tracks);
     void clear();

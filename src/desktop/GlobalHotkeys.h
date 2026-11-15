@@ -6,8 +6,13 @@
 #include <QVariantList>
 #include <QtQmlIntegration>
 
+#include <QTimer>
+
 class QQmlEngine;
 class QJSEngine;
+struct xkb_context;
+struct xkb_keymap;
+struct xkb_state;
 
 // Глобальные горячие клавиши на X11: работают из любой программы.
 // Сочетания хранятся в настройках (группа Hotkeys), захват — XGrabKey на корневом окне.
@@ -18,6 +23,8 @@ class GlobalHotkeys : public QObject, public QAbstractNativeEventFilter
     QML_SINGLETON
     // [{ id, title, sequence (для показа), status: "" | "ok" | "busy" }]
     Q_PROPERTY(QVariantList actions READ actions NOTIFY actionsChanged)
+    // Интерактивный игровой режим: вся клавиатура временно у нас (без смены активного окна).
+    Q_PROPERTY(bool interactive READ interactive NOTIFY interactiveChanged)
 
 public:
     explicit GlobalHotkeys(QObject *parent = nullptr);
@@ -34,11 +41,20 @@ public:
     // Пока пользователь вводит новое сочетание — временно снять все захваты.
     Q_INVOKABLE void suspend(bool suspended);
 
+    bool interactive() const { return m_interactive; }
+    // Захватить клавиатуру целиком (XGrabKeyboard). false — занято (например, игрой).
+    Q_INVOKABLE bool beginInteractive();
+    Q_INVOKABLE void endInteractive();
+
     bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override;
 
 signals:
     void actionsChanged();
     void triggered(const QString &actionId);
+    void interactiveChanged();
+    // key — имя клавиши X11 (Left, Return, BackSpace, space, Prior, Next…, "SuperKey"),
+    // text — напечатанный символ с учётом раскладки (пусто для служебных клавиш).
+    void interactiveKey(const QString &key, const QString &text);
 
 private:
     struct Action {
@@ -58,8 +74,16 @@ private:
     void ungrab(const Action &a);
     Action *find(const QString &id);
 
+    void handleInteractiveKey(quint8 keycode, quint16 state);
+    void resetXkb();
+
     QList<Action> m_actions;
     bool m_suspended = false;
+    bool m_interactive = false;
+    QTimer m_idleTimer;   // страховка: без нажатий клавиатура возвращается игре
+    xkb_context *m_xkbCtx = nullptr;
+    xkb_keymap *m_keymap = nullptr;
+    xkb_state *m_xkbState = nullptr;
 
     static GlobalHotkeys *s_instance;
 };
