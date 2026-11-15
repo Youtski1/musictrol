@@ -1,12 +1,14 @@
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Window
 import QtCore
 import Musictrol
 
 // Главный виджет: стеклянная карточка, живёт на рабочем столе под окнами.
-// Шестерёнка мягко сменяет плеер на настройки (наклон + растворение).
+// Настройки раскрываются кругом из кнопки-шестерёнки поверх плеера.
+// Стекло одно и неподвижное — анимируется только содержимое.
 Window {
     id: win
 
@@ -20,8 +22,9 @@ Window {
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnBottomHint
     color: "transparent"
     title: "Musictrol"
+    // Размер окна постоянный (по большей из сторон) — во время анимаций окно не меняется.
     width: cardWidth + shadowMargin * 2
-    height: Math.max(front.implicitHeight, back.implicitHeight) + shadowMargin * 2
+    height: Math.max(playerColumn.implicitHeight + 40, settingsColumn.implicitHeight + 36) + shadowMargin * 2
     visible: true
 
     // Цвет обложки плавно перетекает при смене трека.
@@ -58,27 +61,34 @@ Window {
         WindowHelper.setInputRect(win, card.x, card.y, card.width, card.height)
     }
 
-    function changeVolume(delta) {
-        if (Music.player.muted)
-            Music.player.muted = false
-        Music.player.volume = Math.max(0, Math.min(100, Music.player.volume + delta))
+    function setSettingsOpen(open) {
+        if (open)
+            card.revealOrigin = gearBtn.mapToItem(card, gearBtn.width / 2, gearBtn.height / 2)
+        card.showSettings = open
     }
 
-    Item {
+    GlassPane {
         id: card
+        window: win
         x: win.shadowMargin
         y: win.shadowMargin
+        originX: x
+        originY: y
         width: win.cardWidth
-        height: showSettings ? back.implicitHeight : front.implicitHeight
-        onHeightChanged: inputTimer.restart()
+        height: showSettings ? settingsColumn.implicitHeight + 36 : playerColumn.implicitHeight + 40
+        tintOpacity: prefs.glassOpacity
+        accent: win.accent
 
         property bool showSettings: false
+        // Точка, откуда растёт круг настроек (центр шестерёнки).
+        property point revealOrigin: Qt.point(width - 40, 36)
 
-        Behavior on height { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
+        Behavior on height { NumberAnimation { duration: 520; easing.type: Easing.InOutCubic } }
+        onHeightChanged: inputTimer.restart()
 
         Timer {
             id: inputTimer
-            interval: 480
+            interval: 540
             onTriggered: win.updateInputRegion()
         }
 
@@ -89,47 +99,30 @@ Window {
             onActiveChanged: if (active) WindowHelper.startMove(win)
         }
 
-        // Колесо мыши над карточкой — громкость.
+        // Колесо мыши над карточкой — громкость (капсула громкости раскрывается).
         WheelHandler {
+            enabled: !card.showSettings
             onWheel: (event) => {
-                win.changeVolume(event.angleDelta.y / 120 * 5)
-                volumeToast.show()
+                if (Music.player.muted)
+                    Music.player.muted = false
+                Music.player.volume = Math.max(0, Math.min(100, Music.player.volume + event.angleDelta.y / 120 * 5))
+                volume.peek()
             }
         }
 
-        // ── Лицевая сторона: плеер ─────────────────────────────────────────
-        GlassPane {
-            id: front
-            window: win
-            originX: card.x
-            originY: card.y
-            width: card.width
-            height: card.height
-            tintOpacity: prefs.glassOpacity
-            accent: win.accent
-            implicitHeight: frontColumn.implicitHeight + 40
-
-            // Мягкий уход: лёгкий наклон, уменьшение и растворение.
+        // ── Плеер ─────────────────────────────────────────────────────────
+        Item {
+            id: playerLayer
+            anchors.fill: parent
             opacity: card.showSettings ? 0 : 1
-            scale: card.showSettings ? 0.94 : 1
+            scale: card.showSettings ? 0.97 : 1
             visible: opacity > 0.01
-            transform: Rotation {
-                origin.x: front.width / 2
-                origin.y: front.height / 2
-                axis { x: 0; y: 1; z: 0 }
-                angle: card.showSettings ? -14 : 0
-                Behavior on angle { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
-            }
-            Behavior on opacity {
-                SequentialAnimation {
-                    PauseAnimation { duration: card.showSettings ? 0 : 140 }
-                    NumberAnimation { duration: card.showSettings ? 240 : 420; easing.type: Easing.OutCubic }
-                }
-            }
-            Behavior on scale { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+            enabled: !card.showSettings
+            Behavior on opacity { NumberAnimation { duration: 460; easing.type: Easing.InOutCubic } }
+            Behavior on scale { NumberAnimation { duration: 520; easing.type: Easing.InOutCubic } }
 
             ColumnLayout {
-                id: frontColumn
+                id: playerColumn
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
@@ -189,10 +182,18 @@ Window {
                         }
                     }
 
-                    // Маленькие кнопки сверху справа: булавка, поиск, настройки.
+                    // Маленькие кнопки сверху справа: поиск, булавка, настройки.
                     Row {
                         Layout.alignment: Qt.AlignTop
                         spacing: 0
+                        IconButton {
+                            iconName: "search"
+                            text: "Поиск"
+                            implicitWidth: 32; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: win.searchRequested()
+                        }
                         IconButton {
                             iconName: "pin"
                             text: prefs.locked ? "Открепить" : "Закрепить на месте"
@@ -203,20 +204,16 @@ Window {
                             onClicked: prefs.locked = !prefs.locked
                         }
                         IconButton {
-                            iconName: "search"
-                            text: "Поиск"
-                            implicitWidth: 32; implicitHeight: 32
-                            iconSize: 16
-                            iconColor: Theme.faint
-                            onClicked: win.searchRequested()
-                        }
-                        IconButton {
+                            id: gearBtn
                             iconName: "settings"
                             text: "Настройки"
                             implicitWidth: 32; implicitHeight: 32
                             iconSize: 16
                             iconColor: Theme.faint
-                            onClicked: card.showSettings = true
+                            onClicked: {
+                                card.revealOrigin = gearBtn.mapToItem(card, width / 2, height / 2)
+                                card.showSettings = true
+                            }
                         }
                     }
                 }
@@ -242,9 +239,10 @@ Window {
                     }
                 }
 
-                // Управление
+                // Управление + громкость-капсула
                 RowLayout {
                     Layout.fillWidth: true
+                    spacing: 6
 
                     IconButton {
                         iconName: "lyrics"
@@ -281,124 +279,46 @@ Window {
                         onClicked: Music.next()
                     }
                     Item { Layout.fillWidth: true }
-                    IconButton {
-                        iconName: "capsule"
-                        text: "Выпустить капсулу"
-                        round: false
-                        iconColor: Theme.dim
-                        baseColor: Qt.rgba(1, 1, 1, 0.08)
-                        onClicked: win.capsuleRequested()
-                    }
-                }
-
-                // Громкость
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-                    IconButton {
-                        iconName: Music.player.muted || Music.player.volume <= 0 ? "mute" : "volume"
-                        text: Music.player.muted ? "Включить звук" : "Без звука"
-                        implicitWidth: 32; implicitHeight: 32
-                        iconSize: 17
-                        iconColor: Music.player.muted ? Theme.faint : Theme.dim
-                        onClicked: Music.player.muted = !Music.player.muted
-                    }
-                    GlassSlider {
-                        Layout.fillWidth: true
-                        from: 0
-                        to: 100
-                        value: Music.player.muted ? 0 : Music.player.volume
-                        smoothing: 90
+                    VolumePill {
+                        id: volume
                         accent: win.accent
-                        onMoved: (v) => {
-                            if (Music.player.muted)
-                                Music.player.muted = false
-                            Music.player.volume = v
-                        }
-                    }
-                    Label {
-                        text: Music.player.muted ? "выкл" : Math.round(Music.player.volume) + "%"
-                        color: Theme.faint
-                        font.pixelSize: 11
-                        Layout.preferredWidth: 30
-                        horizontalAlignment: Text.AlignRight
-                    }
-                }
-            }
-
-            // Всплывающая громкость при прокрутке колеса.
-            Rectangle {
-                id: volumeToast
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: 10
-                width: volRow.implicitWidth + 24
-                height: 30
-                radius: 15
-                color: Qt.rgba(0.05, 0.04, 0.08, 0.85)
-                opacity: 0
-                visible: opacity > 0
-
-                function show() {
-                    opacity = 1
-                    hideTimer.restart()
-                }
-                Behavior on opacity { NumberAnimation { duration: 180 } }
-                Timer { id: hideTimer; interval: 900; onTriggered: volumeToast.opacity = 0 }
-
-                Row {
-                    id: volRow
-                    anchors.centerIn: parent
-                    spacing: 8
-                    Icon {
-                        name: Music.player.volume > 0 ? "volume" : "mute"
-                        size: 16
-                        color: Theme.fg
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    Label {
-                        text: Math.round(Music.player.volume) + "%"
-                        color: Theme.fg
-                        font.pixelSize: 13
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
             }
         }
 
-        // ── Настройки ─────────────────────────────────────────────────────
-        GlassPane {
-            id: back
-            window: win
-            originX: card.x
-            originY: card.y
-            width: card.width
-            height: card.height
-            tintOpacity: Math.max(prefs.glassOpacity, 0.7)
-            accent: win.accent
-            implicitHeight: backColumn.implicitHeight + 36
+        // ── Настройки: раскрываются кругом из шестерёнки ─────────────────
+        readonly property real revealMax: {
+            const o = revealOrigin
+            const h = Math.max(height, settingsColumn.implicitHeight + 36)
+            return Math.hypot(Math.max(o.x, width - o.x), Math.max(o.y, h - o.y)) + 2
+        }
+        property real revealRadius: showSettings ? revealMax : 0
+        Behavior on revealRadius { NumberAnimation { duration: 560; easing.type: Easing.InOutCubic } }
+        readonly property bool revealing: revealRadius > 0.5 && revealRadius < revealMax - 0.5
 
-            // Мягкое появление навстречу: наклон с другой стороны.
-            opacity: card.showSettings ? 1 : 0
-            scale: card.showSettings ? 1 : 1.05
-            visible: opacity > 0.01
-            transform: Rotation {
-                origin.x: back.width / 2
-                origin.y: back.height / 2
-                axis { x: 0; y: 1; z: 0 }
-                angle: card.showSettings ? 0 : 14
-                Behavior on angle { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+        Item {
+            id: settingsLayer
+            anchors.fill: parent
+            visible: card.revealRadius > 0.5
+            enabled: card.showSettings
+            // Маска нужна только пока круг растёт/сжимается.
+            layer.enabled: card.revealing
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: revealMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1.0
             }
-            Behavior on opacity {
-                SequentialAnimation {
-                    PauseAnimation { duration: card.showSettings ? 140 : 0 }
-                    NumberAnimation { duration: card.showSettings ? 420 : 240; easing.type: Easing.OutCubic }
-                }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusCard
+                color: Qt.rgba(0.06, 0.045, 0.1, 0.62)
             }
-            Behavior on scale { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
 
             ColumnLayout {
-                id: backColumn
+                id: settingsColumn
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
@@ -406,18 +326,24 @@ Window {
                 spacing: 14
 
                 RowLayout {
-                    spacing: 6
-                    IconButton {
-                        iconName: "back"
-                        text: "Назад"
-                        iconSize: 18
-                        onClicked: card.showSettings = false
-                    }
+                    Layout.fillWidth: true
                     Label {
                         text: "Настройки"
                         color: Theme.fg
                         font.pixelSize: 17
                         font.weight: Font.DemiBold
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 4
+                    }
+                    // Кнопка закрытия стоит на месте шестерёнки — круг сворачивается туда же.
+                    IconButton {
+                        iconName: "close"
+                        text: "Закрыть настройки"
+                        implicitWidth: 32; implicitHeight: 32
+                        iconSize: 16
+                        iconColor: Theme.dim
+                        Layout.rightMargin: -2
+                        onClicked: card.showSettings = false
                     }
                 }
 
@@ -489,6 +415,21 @@ Window {
                         }
                     }
                 }
+            }
+        }
+
+        // Круг-маска для раскрытия настроек.
+        Item {
+            id: revealMask
+            anchors.fill: settingsLayer
+            layer.enabled: card.revealing
+            visible: false
+            Rectangle {
+                x: card.revealOrigin.x - card.revealRadius
+                y: card.revealOrigin.y - card.revealRadius
+                width: card.revealRadius * 2
+                height: width
+                radius: width / 2
             }
         }
     }

@@ -47,6 +47,7 @@ qt_add_qml_module(musictrol
         qml/components/Icon.qml
         qml/components/IconButton.qml
         qml/components/GlassSlider.qml
+        qml/components/VolumePill.qml
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml

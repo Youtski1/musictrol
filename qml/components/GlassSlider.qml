@@ -3,8 +3,8 @@ import QtQuick.Effects
 import Musictrol
 
 // Общий ползунок виджетов: перемотка, громкость, настройки.
-// Градиентная заливка цветом обложки с мягким свечением, бегунок с кольцом,
-// плавное движение заливки и подсказка значения при наведении.
+// Спокойный вид: тонкая полоса, мягкий градиент цветом обложки с лёгким
+// свечением, небольшой бегунок. Заливка движется непрерывно, без ступенек.
 Item {
     id: root
 
@@ -12,15 +12,18 @@ Item {
     property real from: 0
     property real to: 1
     property color accent: Theme.brand
-    // Сглаживание движения заливки между редкими обновлениями значения (мс).
-    property int smoothing: 120
+    // Сглаживание движения заливки между обновлениями значения (мс).
+    property int smoothing: 160
     // Подсказка над курсором: функция(значение) → текст. Пусто — без подсказки.
     property var tooltipText: null
+
+    readonly property alias pressed: area.pressed
+    readonly property alias hovered: area.containsMouse
 
     signal moved(real value)      // во время перетаскивания
     signal committed(real value)  // отпустили кнопку мыши
 
-    implicitHeight: 18
+    implicitHeight: 16
 
     readonly property real span: to - from
     readonly property real ratio: span !== 0 ? Math.max(0, Math.min(1, (value - from) / span)) : 0
@@ -33,10 +36,9 @@ Item {
     Timer { id: holdTimer; interval: 800; onTriggered: root.holding = false }
     onRatioChanged: if (holding && Math.abs(ratio - dragRatio) < 0.02) holding = false
 
-    // Плавно догоняет настоящее значение, при перетаскивании — сразу под мышью.
     property real smoothRatio: ratio
     Behavior on smoothRatio {
-        enabled: !area.pressed && !root.holding
+        enabled: !area.pressed && !root.holding && root.smoothing > 0
         NumberAnimation { duration: root.smoothing; easing.type: Easing.Linear }
     }
     readonly property real shown: (area.pressed || holding) ? dragRatio : smoothRatio
@@ -45,24 +47,22 @@ Item {
         id: track
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width
-        height: root.hot ? 7 : 5
-        Behavior on height { NumberAnimation { duration: Theme.durMid; easing.type: Easing.OutCubic } }
+        height: root.hot ? 5 : 4
+        Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
         Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: Qt.rgba(1, 1, 1, 0.12)
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.05)
+            color: Qt.rgba(1, 1, 1, 0.10)
         }
 
         RectangularShadow {
             anchors.fill: fill
             radius: fill.radius
-            blur: root.hot ? 14 : 9
-            color: Qt.alpha(root.accent, root.hot ? 0.75 : 0.5)
+            blur: 8
+            color: Qt.alpha(root.accent, root.hot ? 0.45 : 0.3)
             visible: fill.visible
-            Behavior on blur { NumberAnimation { duration: Theme.durMid } }
+            Behavior on color { ColorAnimation { duration: 300 } }
         }
 
         Rectangle {
@@ -73,35 +73,35 @@ Item {
             visible: root.shown > 0.001
             gradient: Gradient {
                 orientation: Gradient.Horizontal
-                GradientStop { position: 0; color: Qt.darker(root.accent, 1.15) }
-                GradientStop { position: 1; color: Qt.lighter(root.accent, 1.35) }
+                GradientStop { position: 0; color: Qt.alpha(root.accent, 0.75) }
+                GradientStop { position: 1; color: Qt.lighter(root.accent, 1.2) }
             }
         }
     }
 
-    // Бегунок: белый с цветным кольцом, появляется при наведении.
+    // Небольшой бегунок, мягко проявляется при наведении.
     Rectangle {
         id: knob
-        readonly property real size: area.pressed ? 18 : 15
-        width: size
-        height: size
-        radius: size / 2
+        width: 12
+        height: 12
+        radius: 6
         anchors.verticalCenter: parent.verticalCenter
         x: track.width * root.shown - width / 2
         color: "white"
-        border.width: 3
-        border.color: Qt.lighter(root.accent, 1.2)
+        border.width: 2
+        border.color: Qt.lighter(root.accent, 1.15)
         opacity: root.hot && root.enabled ? 1 : 0
-        scale: root.hot ? 1 : 0.6
-        Behavior on opacity { NumberAnimation { duration: Theme.durMid } }
-        Behavior on scale { NumberAnimation { duration: Theme.durMid; easing.type: Easing.OutBack } }
-        Behavior on width { NumberAnimation { duration: Theme.durFast } }
+        scale: area.pressed ? 1.15 : (root.hot ? 1 : 0.7)
+        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
     }
 
     // Подсказка значения над курсором.
     Rectangle {
         id: bubble
-        visible: root.tooltipText !== null && area.containsMouse
+        opacity: root.tooltipText !== null && area.containsMouse ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
         readonly property real hoverRatio: area.pressed ? root.dragRatio : area.mouseX / Math.max(1, area.width)
         width: bubbleText.implicitWidth + 14
         height: 22
