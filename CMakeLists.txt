@@ -24,7 +24,8 @@ qt_add_executable(musictrol
     src/youtube/YouTubeSearch.cpp
 )
 
-target_include_directories(musictrol PRIVATE src)
+# Подпапки нужны генератору регистрации QML-типов: он подключает заголовки по имени файла.
+target_include_directories(musictrol PRIVATE src src/core src/player src/youtube)
 
 qt_add_qml_module(musictrol
     URI Musictrol
