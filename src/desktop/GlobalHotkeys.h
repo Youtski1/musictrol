@@ -55,7 +55,8 @@ signals:
     void interactiveChanged();
     // key — имя клавиши X11 (Left, Return, BackSpace, space, Prior, Next…, "SuperKey"),
     // text — напечатанный символ с учётом раскладки (пусто для служебных клавиш).
-    void interactiveKey(const QString &key, const QString &text);
+    // shift — зажат ли Shift (для Shift + стрелки).
+    void interactiveKey(const QString &key, const QString &text, bool shift);
     // Сочетание не принято (например, одиночная клавиша без Ctrl/Alt/Super/Shift).
     void assignRejected(const QString &actionId, const QString &reason);
 

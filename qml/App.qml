@@ -28,8 +28,16 @@ QtObject {
         property bool enabled: true
     }
 
+    // Меню музыки для игр: поверх затемнённой игры, с живой полосой, без смены фокуса.
+    property MusicPanel gamePanel: MusicPanel {
+        gameMode: true
+        lyricsOnWidget: app.lyricsPrefs.onWidget
+        onLyricsToggled: (on) => app.lyricsPrefs.onWidget = on
+    }
+
     property MiniWidget mini: MiniWidget {
         panelOpen: app.panel.opened
+        externalInteractive: app.gamePanel.opened
         gameBehavior: app.gamePrefs.behavior
         cornerEnabled: app.capsulePrefs.enabled
         onTogglePanel: app.panel.toggle(screen)
@@ -57,9 +65,8 @@ QtObject {
             case "panel":
                 // В игре — живая полоса с клавиатуры (игра остаётся активной),
                 // иначе — панель музыки.
-                if (app.mini.gameMode) {
-                    if (!app.mini.enterInteractive())
-                        app.mini.setWaveMode(!app.mini.waveMode)
+                if (app.mini.gameMode || app.gamePanel.opened) {
+                    app.gamePanel.toggle(app.mini.screen)
                 } else {
                     app.panel.toggle(app.mini.screen)
                 }
@@ -112,6 +119,15 @@ QtObject {
                     save(app.mini, "capsule-expanded")
                     app.mini.forceExpanded(false)
                     app.mini.setWaveMode(true)
+                },
+                () => {
+                    app.gamePanel.open(app.mini.screen)
+                    interval = 1500
+                },
+                () => {
+                    app.gamePanel.contentItem.grabToImage(r => r.saveToFile(dir + "/game-menu.png"))
+                    app.gamePanel.close()
+                    interval = 900
                 },
                 () => {
                     save(app.mini, "capsule-wave")

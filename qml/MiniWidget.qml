@@ -42,7 +42,8 @@ Window {
     property bool fullscreenActive: false
     readonly property bool gameMode: fullscreenActive && gameBehavior !== "normal"
     property bool previewInteractive: false   // только для снимков разработчика
-    readonly property bool interactive: GlobalHotkeys.interactive || previewInteractive
+    property bool externalInteractive: false   // клавиатура у игрового меню, не у капсулы
+    readonly property bool interactive: (GlobalHotkeys.interactive && !externalInteractive) || previewInteractive
     // Капсула спрятана: в игре и не в интерактивном режиме.
     readonly property bool hidden: gameMode && !interactive
     // Кружок в углу можно выключить; живая полоса (перемотка, игровой режим) всё равно включается.
@@ -141,7 +142,7 @@ Window {
 
     Connections {
         target: GlobalHotkeys
-        function onInteractiveKey(key, text) { mini.handleGameKey(key, text) }
+        function onInteractiveKey(key, text) { if (mini.interactive) mini.handleGameKey(key, text) }
     }
 
     // Подсказки и поиск под полосой

@@ -466,7 +466,8 @@ void GlobalHotkeys::handleInteractiveKey(quint8 keycode, quint16 state)
                 text.clear();
         }
     }
-    QMetaObject::invokeMethod(this, [this, key, text] { emit interactiveKey(key, text); }, Qt::QueuedConnection);
+    const bool shift = state & XCB_MOD_MASK_SHIFT;
+    QMetaObject::invokeMethod(this, [this, key, text, shift] { emit interactiveKey(key, text, shift); }, Qt::QueuedConnection);
 }
 
 bool GlobalHotkeys::nativeEventFilter(const QByteArray &eventType, void *message, qintptr *)

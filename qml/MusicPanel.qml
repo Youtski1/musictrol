@@ -25,7 +25,11 @@ Window {
     readonly property int secDownloads: 5
     property int section: secSearch
 
-    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    // Игровой вариант (Super+M в игре): окно мимо оконного менеджера — игра остаётся
+    // активной, панель задач не вылезает; клавиатура приходит через GlobalHotkeys.
+    property bool gameMode: false
+    flags: gameMode ? (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.BypassWindowManagerHint)
+                    : (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
     color: "transparent"
     title: "Musictrol — музыка"
     visible: false
@@ -44,13 +48,22 @@ Window {
         hideTimer.stop()
         show()
         raise()
-        requestActivate()
-        WindowHelper.setupWidgetWindow(overlay, WindowHelper.Above)
+        if (gameMode) {
+            // Клавиатуру забираем напрямую (без смены активного окна).
+            searchField.text = ""
+            if (!devSnapshot)
+                gotKeyboard = GlobalHotkeys.beginInteractive()
+        } else {
+            requestActivate()
+            WindowHelper.setupWidgetWindow(overlay, WindowHelper.Above)
+        }
         opened = true
         if (section === secQueue)
             carousel.currentIndex = Math.max(0, Music.currentIndex)
-        searchField.forceActiveFocus()
-        searchField.selectAll()
+        if (!gameMode) {
+            searchField.forceActiveFocus()
+            searchField.selectAll()
+        }
     }
 
     function close() {
@@ -58,8 +71,70 @@ Window {
             return
         picker.close()
         opened = false
+        if (gameMode)
+            GlobalHotkeys.endInteractive()
         hideTimer.restart()
         closed()
+    }
+
+    // ── Игровой режим: клавиши приходят из GlobalHotkeys ─────────────────
+    readonly property bool devSnapshot: Qt.application.arguments.indexOf("--snapshot") > 0
+    property bool gotKeyboard: false
+    // Страховка: если клавиатуру забрать не удалось (её держит игра), меню
+    // не должно «застрять» поверх игры — закрываем через 10 с без мыши.
+    Timer {
+        interval: 10000
+        running: overlay.gameMode && overlay.opened && !overlay.gotKeyboard && !panelHover.hovered && !overlay.devSnapshot
+        onTriggered: overlay.close()
+    }
+    Connections {
+        target: GlobalHotkeys
+        enabled: overlay.gameMode && overlay.opened
+        function onInteractiveKey(key, text, shift) { overlay.handleGameKey(key, text, shift) }
+        // Клавиатуру вернули игре (Esc, Super+M, 30 с без нажатий) — закрываемся.
+        function onInteractiveChanged() { if (!GlobalHotkeys.interactive && overlay.gotKeyboard) { overlay.gotKeyboard = false; overlay.close() } }
+    }
+
+    function handleGameKey(key, text, shift) {
+        const typed = searchField.text
+        switch (key) {
+        case "Escape":
+            if (typed.length > 0) searchField.text = ""
+            else close()
+            return
+        case "Return":
+        case "KP_Enter":
+            searchField.accepted()
+            if (typed.length === 0) playCurrent()
+            return
+        case "BackSpace":
+            searchField.text = typed.slice(0, -1)
+            return
+        case "Left":
+            if (shift) Music.player.seek(Math.max(0, Music.player.position - 5))
+            else carousel.decrementCurrentIndex()
+            return
+        case "Right":
+            if (shift) Music.player.seek(Music.player.position + 5)
+            else carousel.incrementCurrentIndex()
+            return
+        case "Up":
+            Music.player.muted = false
+            Music.player.volume = Math.min(100, Music.player.volume + 5)
+            return
+        case "Down":
+            Music.player.volume = Math.max(0, Music.player.volume - 5)
+            return
+        case "Prior": Music.previous(); return
+        case "Next": Music.next(); return
+        case "Tab": setSection((section + 1) % 6); return
+        case "ISO_Left_Tab": setSection((section + 5) % 6); return
+        case "space":
+            if (typed.length === 0) { Music.togglePause(); return }
+            break
+        }
+        if (text.length > 0)
+            searchField.text = typed + text
     }
 
     function toggle(targetScreen) {
@@ -179,7 +254,7 @@ Window {
     // ── Затемнение ──────────────────────────────────────────────────────
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0.02, 0.015, 0.04, 0.56)
+        color: Qt.rgba(0.02, 0.015, 0.04, overlay.gameMode ? 0.66 : 0.56)
         opacity: overlay.opened ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
     }
@@ -195,7 +270,8 @@ Window {
         width: 640
         height: content.implicitHeight + 32
         x: (overlay.width - width) / 2
-        y: Math.round(overlay.height * 0.42 - height / 2)
+        // В игре под меню ещё живая полоса — ставим обе по центру вместе.
+        y: overlay.gameMode ? Math.round((overlay.height - height - 78) / 2) : Math.round(overlay.height * 0.42 - height / 2)
         radius: 34
         useWallpaper: false
         tintOpacity: 0.88
@@ -209,6 +285,7 @@ Window {
 
         // Клики по панели не должны закрывать её.
         MouseArea { anchors.fill: parent }
+        HoverHandler { id: panelHover }
 
         ColumnLayout {
             id: content
@@ -766,6 +843,66 @@ Window {
             Behavior on opacity { NumberAnimation { duration: 200 } }
             Timer { id: toastTimer; interval: 1600; onTriggered: toast.opacity = 0 }
             Label { id: toastLabel; anchors.centerIn: parent; color: Theme.fg; font.pixelSize: 13 }
+        }
+    }
+
+    // ── Живая полоса под меню (игровой режим) ────────────────────────────
+    Rectangle {
+        id: liveStrip
+        visible: overlay.gameMode
+        x: panel.x
+        width: panel.width
+        y: panel.y + panel.height + 14
+        height: 64
+        radius: 32
+        color: Qt.rgba(0.07, 0.05, 0.1, 0.94)
+        border.width: 1
+        border.color: Qt.alpha(overlay.accent, 0.6)
+        opacity: panel.opacity
+        scale: panel.scale
+
+        MouseArea { anchors.fill: parent }   // клики по полосе не закрывают меню
+
+        RoundedImage {
+            id: stripCover
+            x: 8
+            anchors.verticalCenter: parent.verticalCenter
+            width: 48; height: 48
+            radius: 24
+            source: Music.currentThumbnail
+        }
+        Row {
+            id: stripRight
+            anchors.right: parent.right
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 14
+            Label {
+                text: Music.formatTime(Music.player.position) + " / " + Music.formatTime(Music.player.duration)
+                color: Theme.dim
+                font.pixelSize: 12
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Row {
+                spacing: 6
+                anchors.verticalCenter: parent.verticalCenter
+                Icon { name: Music.player.volume > 0 ? "volume" : "mute"; size: 15; color: Theme.dim; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: Math.round(Music.player.volume) + "%"; color: Theme.dim; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+            }
+        }
+        WaveSeek {
+            anchors.left: stripCover.right
+            anchors.leftMargin: 12
+            anchors.right: stripRight.left
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            height: 40
+            position: Music.player.position
+            duration: Music.player.duration
+            accent: overlay.accent
+            seed: Music.currentVideoId
+            playing: Music.hasTrack && !Music.player.paused && overlay.opened
+            onSeekRequested: (sec) => Music.player.seek(sec)
         }
     }
 
