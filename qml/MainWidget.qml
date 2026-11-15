@@ -21,6 +21,19 @@ Window {
     property string gameBehavior: "hud"
     signal gameBehaviorChosen(string behavior)
     property bool capsuleEnabled: true
+    // Текст песни внизу карточки (переключается из панели музыки).
+    property bool lyricsEnabled: true
+
+    // «Смотрят ли» на карточку: раз в 1,5 с проверяем, не закрыта ли она окнами.
+    // Закрыта — позиция, время и текст не обновляются, карточка не перерисовывается.
+    property bool covered: false
+    readonly property bool live: !covered
+    Timer {
+        interval: 1500; repeat: true; running: true
+        onTriggered: win.covered = WindowHelper.isCovered(win, card.x, card.y, card.width, card.height)
+    }
+    property real shownPosition: 0
+    Binding on shownPosition { value: Music.player.position; when: win.live }
     signal capsuleEnabledChosen(bool enabled)
 
     readonly property int shadowMargin: 40
@@ -249,7 +262,7 @@ Window {
                     spacing: 2
                     GlassSlider {
                         Layout.fillWidth: true
-                        value: Music.player.position
+                        value: win.shownPosition
                         to: Music.player.duration
                         accent: win.accent
                         tooltipText: (v) => Music.formatTime(v)
@@ -258,7 +271,7 @@ Window {
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        Label { text: Music.formatTime(Music.player.position); color: Theme.faint; font.pixelSize: 11 }
+                        Label { text: Music.formatTime(win.shownPosition); color: Theme.faint; font.pixelSize: 11 }
                         Item { Layout.fillWidth: true }
                         Label { text: Music.formatTime(Music.player.duration); color: Theme.faint; font.pixelSize: 11 }
                     }
@@ -316,6 +329,22 @@ Window {
                         id: volume
                         accent: win.accent
                     }
+                }
+
+                // Текст песни: три строки, идут вместе с музыкой.
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
+                    visible: lyricsBox.visible
+                }
+                LyricsView {
+                    id: lyricsBox
+                    Layout.fillWidth: true
+                    visible: win.lyricsEnabled && Music.hasTrack && Lyrics.status === "found"
+                    active: visible && win.live
+                    accent: win.accent
+                    fontSize: 14
                 }
             }
         }

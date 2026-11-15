@@ -12,6 +12,9 @@ Window {
 
     property bool opened: false
     signal closed()
+    // Текст песни показывается на главном виджете; здесь — только включить/выключить.
+    property bool lyricsOnWidget: true
+    signal lyricsToggled(bool on)
 
     // Разделы
     readonly property int secSearch: 0
@@ -670,6 +673,18 @@ Window {
                     baseColor: Qt.rgba(1, 1, 1, 0.1)
                     onClicked: Library.toggleFavorite(overlay.currentModel, carousel.currentIndex)
                 }
+                // Текст песни на главном виджете: вкл/выкл
+                IconButton {
+                    visible: !overlay.playlistGrid
+                    iconName: "lyrics"
+                    text: overlay.lyricsOnWidget ? "Скрыть текст на виджете" : "Показывать текст на виджете"
+                    implicitWidth: 40; implicitHeight: 40
+                    iconSize: 18
+                    iconColor: overlay.lyricsOnWidget ? Qt.lighter(overlay.accent, 1.35) : Theme.fg
+                    baseColor: overlay.lyricsOnWidget ? Qt.alpha(overlay.accent, 0.22) : Qt.rgba(1, 1, 1, 0.1)
+                    onClicked: overlay.lyricsToggled(!overlay.lyricsOnWidget)
+                }
+
                 // Скачать: ↓ → проценты → галочка
                 IconButton {
                     id: dlBtn
@@ -722,15 +737,6 @@ Window {
                             Library.removeFromOpenedPlaylist(i)
                     }
                 }
-            }
-
-            // Текст песни под играющим треком — идёт вместе с музыкой.
-            LyricsView {
-                Layout.fillWidth: true
-                Layout.leftMargin: 30
-                Layout.rightMargin: 30
-                visible: overlay.currentIsPlaying
-                accent: overlay.accent
             }
 
             Label {

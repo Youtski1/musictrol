@@ -6,7 +6,15 @@ import Musictrol
 QtObject {
     id: app
 
-    property MusicPanel panel: MusicPanel {}
+    property Settings lyricsPrefs: Settings {
+        category: "Lyrics"
+        property bool onWidget: true
+    }
+
+    property MusicPanel panel: MusicPanel {
+        lyricsOnWidget: app.lyricsPrefs.onWidget
+        onLyricsToggled: (on) => app.lyricsPrefs.onWidget = on
+    }
 
     // Поведение капсулы в играх: "hud" | "hide" | "normal".
     property Settings gamePrefs: Settings {
@@ -29,6 +37,7 @@ QtObject {
 
     property MainWidget mainWidget: MainWidget {
         onSearchRequested: app.panel.open(app.mini.screen)
+        lyricsEnabled: app.lyricsPrefs.onWidget
         onDownloadsRequested: {
             app.panel.open(app.mini.screen)
             app.panel.setSection(app.panel.secDownloads)

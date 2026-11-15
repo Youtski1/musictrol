@@ -33,6 +33,25 @@ QString cleanup(QString s)
 }
 } // namespace
 
+// Умножить все метки [мм:сс.сс] на factor (для замедленных/ускоренных версий).
+static QString scaleLrc(const QString &lrc, double factor)
+{
+    static const QRegularExpression tag(QStringLiteral(R"(\[(\d+):(\d+(?:\.\d+)?)\])"));
+    QString out;
+    qsizetype last = 0;
+    auto it = tag.globalMatch(lrc);
+    while (it.hasNext()) {
+        const auto m = it.next();
+        out += lrc.mid(last, m.capturedStart() - last);
+        const double t = (m.captured(1).toDouble() * 60 + m.captured(2).toDouble()) * factor;
+        const int mm = int(t / 60);
+        out += QStringLiteral("[%1:%2]").arg(mm, 2, 10, QLatin1Char('0')).arg(t - mm * 60, 5, 'f', 2, QLatin1Char('0'));
+        last = m.capturedEnd();
+    }
+    out += lrc.mid(last);
+    return out;
+}
+
 Lyrics::Lyrics(QObject *parent)
     : QObject(parent)
     , m_net(new QNetworkAccessManager(this))
@@ -112,7 +131,12 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
     setStatus(QStringLiteral("loading"));
     QString artist, title;
     guessArtistTitle(rawTitle, channel, artist, title);
-    qInfo().noquote() << "lyrics: ищу" << artist << "—" << title;
+    // Замедленные/ускоренные версии: текст оригинала, тайминги растягиваем под длину.
+    static const QRegularExpression speedRe(
+        QStringLiteral(R"(slowed|sped\s*up|speed\s*up|nightcore|daycore|замедл|ускор)"),
+        QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+    const bool altered = rawTitle.contains(speedRe);
+    qInfo().noquote() << "lyrics: ищу" << artist << "—" << title << (altered ? "(изменённая скорость)" : "");
 
     QUrl url(QStringLiteral("https://lrclib.net/api/search"));
     QUrlQuery q;
@@ -123,7 +147,7 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
     QNetworkReply *reply = m_net->get(req);
     m_reply = reply;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, videoId, duration] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, videoId, duration, altered] {
         reply->deleteLater();
         if (reply != m_reply || videoId != m_videoId)
             return;
@@ -141,10 +165,19 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
             if (!hasSynced && !hasPlain)
                 continue;
             const double d = o.value(QLatin1String("duration")).toDouble();
-            const double diff = duration > 0 && d > 0 ? std::abs(d - duration) : 5;
-            if (diff > 25)
-                continue; // явно другая песня
-            const double score = (hasSynced ? 100 : 0) - diff;
+            double score;
+            if (altered && duration > 0 && d > 0) {
+                // Во сколько раз версия длиннее/короче оригинала; разумно — 0.6…1.6.
+                const double factor = duration / d;
+                if (factor < 0.6 || factor > 1.6)
+                    continue;
+                score = (hasSynced ? 100 : 0) - std::abs(factor - (factor >= 1 ? 1.2 : 0.8)) * 20;
+            } else {
+                const double diff = duration > 0 && d > 0 ? std::abs(d - duration) : 5;
+                if (diff > 25)
+                    continue; // явно другая песня
+                score = (hasSynced ? 100 : 0) - diff;
+            }
             if (score > bestScore) {
                 bestScore = score;
                 best = o;
@@ -160,7 +193,10 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
             return;
         }
 
-        const QString synced = best.value(QLatin1String("syncedLyrics")).toString();
+        QString synced = best.value(QLatin1String("syncedLyrics")).toString();
+        const double bestDur = best.value(QLatin1String("duration")).toDouble();
+        if (altered && !synced.isEmpty() && duration > 0 && bestDur > 0)
+            synced = scaleLrc(synced, duration / bestDur);
         const QString text = synced.isEmpty() ? best.value(QLatin1String("plainLyrics")).toString() : synced;
         QDir().mkpath(QFileInfo(cachePath(videoId)).path());
         for (const QString &path : {cachePath(videoId),

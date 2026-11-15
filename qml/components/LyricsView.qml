@@ -12,7 +12,11 @@ Item {
     property int visibleLines: 3
     property int fontSize: 15
 
-    readonly property int current: Lyrics.synced ? Lyrics.lineAt(Music.player.position) : -1
+    // Пока false — позиция не читается вовсе: никаких пересчётов и перерисовок.
+    property bool active: true
+    property int frozenLine: -1
+    readonly property int current: active ? (Lyrics.synced ? Lyrics.lineAt(Music.player.position) : -1) : frozenLine
+    onCurrentChanged: if (active) frozenLine = current
     implicitHeight: Lyrics.status === "found" ? (Lyrics.synced ? visibleLines * (fontSize + 14) : 110) : 30
 
     Text {
@@ -36,7 +40,9 @@ Item {
         highlightRangeMode: Lyrics.synced ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
         preferredHighlightBegin: height / 2 - (view.fontSize + 12) / 2
         preferredHighlightEnd: height / 2 + (view.fontSize + 12) / 2
-        highlightMoveDuration: 380
+        // Плавная прокрутка к новой строке.
+        highlightMoveDuration: 650
+        highlightMoveVelocity: -1
 
         // Мягкое исчезание строк к краям.
         layer.enabled: Lyrics.synced
@@ -50,18 +56,25 @@ Item {
             required property int index
             required property var modelData
             readonly property bool active: Lyrics.synced && index === view.current
+            // Чем дальше от текущей строки, тем прозрачнее — без скачков шрифта.
+            readonly property int distance: Lyrics.synced ? Math.abs(index - view.current) : 0
             width: ListView.view.width
             height: view.fontSize + 12
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
             text: modelData.text
-            color: active ? "white" : Qt.rgba(1, 1, 1, Lyrics.synced ? 0.38 : 0.7)
-            font.pixelSize: active ? view.fontSize + 2 : view.fontSize
-            font.weight: active ? Font.Bold : Font.Normal
-            style: active ? Text.Raised : Text.Normal
-            styleColor: Qt.alpha(view.accent, 0.6)
-            Behavior on color { ColorAnimation { duration: 250 } }
+            // Размер и жирность одинаковые у всех строк (смена шрифта даёт рывок);
+            // выделение — плавным масштабом, цветом и прозрачностью.
+            font.pixelSize: view.fontSize
+            font.weight: Font.DemiBold
+            color: active ? "white" : Qt.lighter(view.accent, 1.9)
+            opacity: !Lyrics.synced ? 0.75 : active ? 1 : distance === 1 ? 0.45 : 0.22
+            scale: active ? 1.12 : 1
+            transformOrigin: Item.Center
+            Behavior on color { ColorAnimation { duration: 500; easing.type: Easing.InOutQuad } }
+            Behavior on opacity { NumberAnimation { duration: 550; easing.type: Easing.InOutQuad } }
+            Behavior on scale { NumberAnimation { duration: 550; easing.type: Easing.OutCubic } }
 
             MouseArea {
                 anchors.fill: parent

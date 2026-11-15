@@ -1,6 +1,8 @@
 #include "desktop/WindowHelper.h"
 
 #include <QGuiApplication>
+#include <QCoreApplication>
+#include <QRegion>
 #include <QPointer>
 #include <QTimer>
 #include <QWindow>
@@ -77,6 +79,96 @@ void WindowHelper::startMove(QWindow *window)
 {
     if (window)
         window->startSystemMove();
+}
+
+bool WindowHelper::isCovered(QWindow *window, qreal x, qreal y, qreal width, qreal height) const
+{
+    xcb_connection_t *c = x11Connection();
+    if (!c || !window || !window->isVisible())
+        return false;
+    const xcb_window_t root = xcb_setup_roots_iterator(xcb_get_setup(c)).data->root;
+    const xcb_window_t self = xcb_window_t(window->winId());
+    const qreal dpr = window->devicePixelRatio();
+    const QRect target(QPointF((window->x() + x) * dpr, (window->y() + y) * dpr).toPoint(),
+                       QSizeF(width * dpr, height * dpr).toSize());
+    if (target.isEmpty())
+        return false;
+
+    auto prop = [c](xcb_window_t w, const char *name, xcb_atom_t type, uint32_t len) {
+        return xcb_get_property_reply(c, xcb_get_property(c, 0, w, atom(c, name), type, 0, len), nullptr);
+    };
+
+    // Текущий рабочий стол
+    uint32_t desktop = 0;
+    if (xcb_get_property_reply_t *r = prop(root, "_NET_CURRENT_DESKTOP", XCB_ATOM_CARDINAL, 1)) {
+        if (xcb_get_property_value_length(r) == 4)
+            desktop = *static_cast<uint32_t *>(xcb_get_property_value(r));
+        free(r);
+    }
+
+    xcb_get_property_reply_t *list = prop(root, "_NET_CLIENT_LIST_STACKING", XCB_ATOM_WINDOW, 4096);
+    if (!list)
+        return false;
+    const auto *wins = static_cast<xcb_window_t *>(xcb_get_property_value(list));
+    const int n = xcb_get_property_value_length(list) / 4;
+
+    // Окна идут снизу вверх: учитываем только те, что выше нашего.
+    int start = 0;
+    for (int i = 0; i < n; ++i)
+        if (wins[i] == self) { start = i + 1; break; }
+
+    const xcb_atom_t hidden = atom(c, "_NET_WM_STATE_HIDDEN");
+    const xcb_atom_t typeDesktop = atom(c, "_NET_WM_WINDOW_TYPE_DESKTOP");
+    const xcb_atom_t typeDock = atom(c, "_NET_WM_WINDOW_TYPE_DOCK");
+    const uint32_t ourPid = uint32_t(QCoreApplication::applicationPid());
+    QRegion covered;
+
+    for (int i = start; i < n; ++i) {
+        const xcb_window_t w = wins[i];
+        bool skip = false;
+        if (xcb_get_property_reply_t *r = prop(w, "_NET_WM_PID", XCB_ATOM_CARDINAL, 1)) {
+            skip = xcb_get_property_value_length(r) == 4 && *static_cast<uint32_t *>(xcb_get_property_value(r)) == ourPid;
+            free(r);
+        }
+        if (!skip) if (xcb_get_property_reply_t *r = prop(w, "_NET_WM_DESKTOP", XCB_ATOM_CARDINAL, 1)) {
+            if (xcb_get_property_value_length(r) == 4) {
+                const uint32_t d = *static_cast<uint32_t *>(xcb_get_property_value(r));
+                skip = d != desktop && d != 0xFFFFFFFF;
+            }
+            free(r);
+        }
+        if (!skip) if (xcb_get_property_reply_t *r = prop(w, "_NET_WM_STATE", XCB_ATOM_ATOM, 32)) {
+            const auto *a = static_cast<xcb_atom_t *>(xcb_get_property_value(r));
+            for (int k = 0; k < xcb_get_property_value_length(r) / 4; ++k)
+                skip = skip || a[k] == hidden;
+            free(r);
+        }
+        if (!skip) if (xcb_get_property_reply_t *r = prop(w, "_NET_WM_WINDOW_TYPE", XCB_ATOM_ATOM, 8)) {
+            const auto *a = static_cast<xcb_atom_t *>(xcb_get_property_value(r));
+            for (int k = 0; k < xcb_get_property_value_length(r) / 4; ++k)
+                skip = skip || a[k] == typeDesktop || a[k] == typeDock;
+            free(r);
+        }
+        if (skip)
+            continue;
+
+        xcb_get_geometry_reply_t *g = xcb_get_geometry_reply(c, xcb_get_geometry(c, w), nullptr);
+        if (!g)
+            continue;
+        xcb_translate_coordinates_reply_t *t = xcb_translate_coordinates_reply(
+            c, xcb_translate_coordinates(c, w, root, 0, 0), nullptr);
+        if (t) {
+            covered += QRect(t->dst_x, t->dst_y, g->width, g->height).intersected(target);
+            free(t);
+        }
+        free(g);
+    }
+    free(list);
+
+    qint64 area = 0;
+    for (const QRect &r : covered)
+        area += qint64(r.width()) * r.height();
+    return area * 2 > qint64(target.width()) * target.height();
 }
 
 bool WindowHelper::activeWindowFullscreen() const
