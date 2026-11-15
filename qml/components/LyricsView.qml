@@ -17,7 +17,7 @@ Item {
     property int frozenLine: -1
     readonly property int current: active ? (Lyrics.synced ? Lyrics.lineAt(Music.player.position) : -1) : frozenLine
     onCurrentChanged: if (active) frozenLine = current
-    implicitHeight: Lyrics.status === "found" ? (Lyrics.synced ? visibleLines * (fontSize + 14) : 110) : 30
+    implicitHeight: Lyrics.status === "found" ? (Lyrics.synced ? visibleLines * (fontSize + 14) + fontSize : 110) : 30
 
     Text {
         anchors.centerIn: parent
@@ -38,8 +38,9 @@ Item {
         spacing: 2
         currentIndex: Math.max(0, view.current)
         highlightRangeMode: Lyrics.synced ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
-        preferredHighlightBegin: height / 2 - (view.fontSize + 12) / 2
-        preferredHighlightEnd: height / 2 + (view.fontSize + 12) / 2
+        // Текущая строка — по центру (строки бывают в 1–2 ряда).
+        preferredHighlightBegin: height / 2 - (currentItem ? currentItem.height / 2 : 0)
+        preferredHighlightEnd: height / 2 + (currentItem ? currentItem.height / 2 : 0)
         // Плавная прокрутка к новой строке.
         highlightMoveDuration: 650
         highlightMoveVelocity: -1
@@ -58,11 +59,17 @@ Item {
             readonly property bool active: Lyrics.synced && index === view.current
             // Чем дальше от текущей строки, тем прозрачнее — без скачков шрифта.
             readonly property int distance: Lyrics.synced ? Math.abs(index - view.current) : 0
-            width: ListView.view.width
-            height: view.fontSize + 12
+            // Ширина с запасом под увеличение текущей строки — чтобы не вылезала за рамку.
+            width: ListView.view.width / 1.1
+            x: (ListView.view.width - width) / 2
+            height: Math.max(view.fontSize + 12, implicitHeight + 6)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+            // Длинные строки переносятся (максимум в 2 ряда), а не обрезаются.
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
             elide: Text.ElideRight
+            lineHeight: 0.95
             text: modelData.text
             // Размер и жирность одинаковые у всех строк (смена шрифта даёт рывок);
             // выделение — плавным масштабом, цветом и прозрачностью.
@@ -70,7 +77,7 @@ Item {
             font.weight: Font.DemiBold
             color: active ? "white" : Qt.lighter(view.accent, 1.9)
             opacity: !Lyrics.synced ? 0.75 : active ? 1 : distance === 1 ? 0.45 : 0.22
-            scale: active ? 1.12 : 1
+            scale: active ? 1.08 : 1
             transformOrigin: Item.Center
             Behavior on color { ColorAnimation { duration: 500; easing.type: Easing.InOutQuad } }
             Behavior on opacity { NumberAnimation { duration: 550; easing.type: Easing.InOutQuad } }
