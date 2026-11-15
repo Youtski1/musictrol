@@ -87,8 +87,6 @@ Window {
                              : playerColumn.implicitHeight + 40
         tintOpacity: prefs.glassOpacity
         accent: win.accent
-        backdrop: Music.currentThumbnail
-        backdropOpacity: 0.5
 
         property bool showSettings: false
         property bool showHotkeys: false
@@ -142,25 +140,17 @@ Window {
                 anchors.margins: 20
                 spacing: 12
 
-                // Крупная обложка слева, справа — кнопки, название и исполнитель.
                 RowLayout {
-                    spacing: 16
+                    spacing: 14
                     Layout.fillWidth: true
 
                     Item {
-                        Layout.preferredWidth: 140
-                        Layout.preferredHeight: 140
+                        Layout.preferredWidth: 72
+                        Layout.preferredHeight: 72
 
-                        RectangularShadow {
-                            anchors.fill: parent
-                            radius: 16
-                            blur: 22
-                            offset.y: 8
-                            color: Qt.rgba(0, 0, 0, 0.45)
-                        }
                         Rectangle {
                             anchors.fill: parent
-                            radius: 16
+                            radius: 12
                             gradient: Gradient {
                                 GradientStop { position: 0; color: Qt.lighter(win.accent, 1.2) }
                                 GradientStop { position: 1; color: Qt.darker(win.accent, 2.4) }
@@ -169,7 +159,7 @@ Window {
                             Icon {
                                 anchors.centerIn: parent
                                 name: "music"
-                                size: 40
+                                size: 26
                                 color: Qt.rgba(1, 1, 1, 0.8)
                                 visible: !Music.hasTrack
                             }
@@ -177,70 +167,21 @@ Window {
                         RoundedImage {
                             id: cover
                             anchors.fill: parent
-                            radius: 16
-                            source: Music.currentThumbnail ? Music.currentThumbnail.toString().replace("mqdefault", "hq720") : ""
-                            fallbackSource: Music.currentThumbnail
+                            radius: 12
+                            source: Music.currentThumbnail
                         }
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 140
                         spacing: 4
-
-                        // Маленькие кнопки: поиск, капсула, булавка, настройки.
-                        Row {
-                            Layout.alignment: Qt.AlignRight
-                            Layout.rightMargin: -6
-                            spacing: 0
-                            IconButton {
-                                iconName: "search"
-                                text: "Поиск"
-                                implicitWidth: 30; implicitHeight: 32
-                                iconSize: 16
-                                iconColor: Theme.faint
-                                onClicked: win.searchRequested()
-                            }
-                            IconButton {
-                                iconName: "wave"
-                                text: "Выпустить капсулу (перемотка сверху)"
-                                implicitWidth: 30; implicitHeight: 32
-                                iconSize: 16
-                                iconColor: Theme.faint
-                                onClicked: win.capsuleRequested()
-                            }
-                            IconButton {
-                                iconName: "pin"
-                                text: prefs.locked ? "Открепить" : "Закрепить на месте"
-                                implicitWidth: 30; implicitHeight: 32
-                                iconSize: 16
-                                iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
-                                baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
-                                onClicked: prefs.locked = !prefs.locked
-                            }
-                            IconButton {
-                                id: gearBtn
-                                iconName: "settings"
-                                text: "Настройки"
-                                implicitWidth: 30; implicitHeight: 32
-                                iconSize: 16
-                                iconColor: Theme.faint
-                                onClicked: win.setSettingsOpen(true)
-                            }
-                        }
-
-                        Item { Layout.fillHeight: true }
-
                         Label {
                             Layout.fillWidth: true
                             text: Music.hasTrack ? Music.currentTitle : "Ничего не играет"
                             color: Theme.fg
-                            font.pixelSize: 18
+                            font.pixelSize: 17
                             font.weight: Font.DemiBold
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
                             elide: Text.ElideRight
-                            lineHeight: 1.05
                         }
                         Label {
                             Layout.fillWidth: true
@@ -249,7 +190,49 @@ Window {
                             color: Theme.dim
                             font.pixelSize: 13
                             elide: Text.ElideRight
-                            Layout.bottomMargin: 2
+                        }
+                    }
+
+                    // Маленькие кнопки сверху справа: поиск, булавка, настройки.
+                    Row {
+                        Layout.alignment: Qt.AlignTop
+                        spacing: 0
+                        IconButton {
+                            iconName: "search"
+                            text: "Поиск"
+                            implicitWidth: 30; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: win.searchRequested()
+                        }
+                        IconButton {
+                            iconName: "wave"
+                            text: "Выпустить капсулу (перемотка сверху)"
+                            implicitWidth: 30; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: win.capsuleRequested()
+                        }
+                        IconButton {
+                            iconName: "pin"
+                            text: prefs.locked ? "Открепить" : "Закрепить на месте"
+                            implicitWidth: 30; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
+                            baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
+                            onClicked: prefs.locked = !prefs.locked
+                        }
+                        IconButton {
+                            id: gearBtn
+                            iconName: "settings"
+                            text: "Настройки"
+                            implicitWidth: 30; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: {
+                                card.revealOrigin = gearBtn.mapToItem(card, width / 2, height / 2)
+                                card.showSettings = true
+                            }
                         }
                     }
                 }
