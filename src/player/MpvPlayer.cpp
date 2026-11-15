@@ -18,6 +18,7 @@ enum ObserveId : uint64_t {
     TimePosId,
     DurationId,
     VolumeId,
+    MuteId,
 };
 } // namespace
 
@@ -48,6 +49,7 @@ MpvPlayer::MpvPlayer(QObject *parent)
     mpv_observe_property(m_mpv, TimePosId, "time-pos", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, DurationId, "duration", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, VolumeId, "volume", MPV_FORMAT_DOUBLE);
+    mpv_observe_property(m_mpv, MuteId, "mute", MPV_FORMAT_FLAG);
 
     mpv_request_log_messages(m_mpv, "warn");
     mpv_set_wakeup_callback(m_mpv, &MpvPlayer::wakeup, this);
@@ -135,6 +137,18 @@ void MpvPlayer::setVolume(double volume)
     }
 }
 
+void MpvPlayer::setMuted(bool muted)
+{
+    if (!m_mpv)
+        return;
+    int flag = muted ? 1 : 0;
+    mpv_set_property_async(m_mpv, 0, "mute", MPV_FORMAT_FLAG, &flag);
+    if (m_muted != muted) {
+        m_muted = muted;
+        emit mutedChanged();
+    }
+}
+
 void MpvPlayer::setLoading(bool loading)
 {
     if (m_loading == loading)
@@ -204,6 +218,11 @@ void MpvPlayer::handlePropertyChange(const char *name, int format, void *data)
     } else if (std::strcmp(name, "duration") == 0) {
         const double v = format == MPV_FORMAT_DOUBLE ? *static_cast<double *>(data) : 0.0;
         if (!qFuzzyCompare(v + 1, m_duration + 1)) { m_duration = v; emit durationChanged(); }
+    } else if (std::strcmp(name, "mute") == 0) {
+        if (format == MPV_FORMAT_FLAG) {
+            const bool m = *static_cast<int *>(data) != 0;
+            if (m != m_muted) { m_muted = m; emit mutedChanged(); }
+        }
     } else if (std::strcmp(name, "volume") == 0) {
         if (format == MPV_FORMAT_DOUBLE) {
             const double v = *static_cast<double *>(data);

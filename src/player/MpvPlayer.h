@@ -16,6 +16,7 @@ class MpvPlayer : public QObject
     Q_PROPERTY(double position READ position NOTIFY positionChanged)
     Q_PROPERTY(double duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
+    Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
 
 public:
@@ -27,6 +28,7 @@ public:
     double duration() const { return m_duration; }
     double volume() const { return m_volume; }
     bool loading() const { return m_loading; }
+    bool muted() const { return m_muted; }
 
     Q_INVOKABLE void load(const QString &url);
     Q_INVOKABLE void stop();
@@ -34,8 +36,10 @@ public:
     Q_INVOKABLE void seek(double seconds);
     void setPaused(bool paused);
     void setVolume(double volume);
+    void setMuted(bool muted);
 
 signals:
+    void mutedChanged();
     void pausedChanged();
     void positionChanged();
     void durationChanged();
@@ -57,4 +61,5 @@ private:
     double m_duration = 0;
     double m_volume = 70;
     bool m_loading = false;
+    bool m_muted = false;
 };

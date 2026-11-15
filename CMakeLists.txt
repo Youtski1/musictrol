@@ -46,7 +46,7 @@ qt_add_qml_module(musictrol
         qml/DevWindow.qml
         qml/components/Icon.qml
         qml/components/IconButton.qml
-        qml/components/SeekBar.qml
+        qml/components/GlassSlider.qml
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml

@@ -6,7 +6,7 @@ import QtCore
 import Musictrol
 
 // Главный виджет: стеклянная карточка, живёт на рабочем столе под окнами.
-// Шестерёнка переворачивает карточку на обратную сторону — настройки.
+// Шестерёнка мягко сменяет плеер на настройки (наклон + растворение).
 Window {
     id: win
 
@@ -58,29 +58,27 @@ Window {
         WindowHelper.setInputRect(win, card.x, card.y, card.width, card.height)
     }
 
-    Flipable {
+    function changeVolume(delta) {
+        if (Music.player.muted)
+            Music.player.muted = false
+        Music.player.volume = Math.max(0, Math.min(100, Music.player.volume + delta))
+    }
+
+    Item {
         id: card
         x: win.shadowMargin
         y: win.shadowMargin
         width: win.cardWidth
-        height: flipped ? back.implicitHeight : front.implicitHeight
+        height: showSettings ? back.implicitHeight : front.implicitHeight
         onHeightChanged: inputTimer.restart()
 
-        property bool flipped: false
+        property bool showSettings: false
 
-        Behavior on height { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-
-        transform: Rotation {
-            origin.x: card.width / 2
-            origin.y: card.height / 2
-            axis { x: 0; y: 1; z: 0 }
-            angle: card.flipped ? 180 : 0
-            Behavior on angle { NumberAnimation { duration: 460; easing.type: Easing.InOutCubic } }
-        }
+        Behavior on height { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
 
         Timer {
             id: inputTimer
-            interval: 340
+            interval: 480
             onTriggered: win.updateInputRegion()
         }
 
@@ -94,13 +92,13 @@ Window {
         // Колесо мыши над карточкой — громкость.
         WheelHandler {
             onWheel: (event) => {
-                Music.player.volume = Math.max(0, Math.min(100, Music.player.volume + event.angleDelta.y / 120 * 5))
+                win.changeVolume(event.angleDelta.y / 120 * 5)
                 volumeToast.show()
             }
         }
 
         // ── Лицевая сторона: плеер ─────────────────────────────────────────
-        front: GlassPane {
+        GlassPane {
             id: front
             window: win
             originX: card.x
@@ -111,11 +109,32 @@ Window {
             accent: win.accent
             implicitHeight: frontColumn.implicitHeight + 40
 
+            // Мягкий уход: лёгкий наклон, уменьшение и растворение.
+            opacity: card.showSettings ? 0 : 1
+            scale: card.showSettings ? 0.94 : 1
+            visible: opacity > 0.01
+            transform: Rotation {
+                origin.x: front.width / 2
+                origin.y: front.height / 2
+                axis { x: 0; y: 1; z: 0 }
+                angle: card.showSettings ? -14 : 0
+                Behavior on angle { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+            }
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: card.showSettings ? 0 : 140 }
+                    NumberAnimation { duration: card.showSettings ? 240 : 420; easing.type: Easing.OutCubic }
+                }
+            }
+            Behavior on scale { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+
             ColumnLayout {
                 id: frontColumn
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
                 anchors.margins: 20
-                spacing: 14
+                spacing: 12
 
                 RowLayout {
                     spacing: 14
@@ -170,34 +189,50 @@ Window {
                         }
                     }
 
-                    IconButton {
-                        iconName: "search"
-                        text: "Поиск"
-                        iconColor: Theme.dim
-                        iconSize: 18
+                    // Маленькие кнопки сверху справа: булавка, поиск, настройки.
+                    Row {
                         Layout.alignment: Qt.AlignTop
-                        onClicked: win.searchRequested()
-                    }
-                    IconButton {
-                        iconName: "settings"
-                        text: "Настройки"
-                        iconColor: Theme.dim
-                        iconSize: 18
-                        Layout.alignment: Qt.AlignTop
-                        Layout.leftMargin: -10
-                        onClicked: card.flipped = true
+                        spacing: 0
+                        IconButton {
+                            iconName: "pin"
+                            text: prefs.locked ? "Открепить" : "Закрепить на месте"
+                            implicitWidth: 32; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
+                            baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
+                            onClicked: prefs.locked = !prefs.locked
+                        }
+                        IconButton {
+                            iconName: "search"
+                            text: "Поиск"
+                            implicitWidth: 32; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: win.searchRequested()
+                        }
+                        IconButton {
+                            iconName: "settings"
+                            text: "Настройки"
+                            implicitWidth: 32; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: card.showSettings = true
+                        }
                     }
                 }
 
+                // Перемотка
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 4
-                    SeekBar {
+                    Layout.topMargin: 4
+                    spacing: 2
+                    GlassSlider {
                         Layout.fillWidth: true
                         value: Music.player.position
                         to: Music.player.duration
                         accent: win.accent
-                        onSeekRequested: (s) => Music.player.seek(s)
+                        tooltipText: (v) => Music.formatTime(v)
+                        onCommitted: (v) => Music.player.seek(v)
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -207,6 +242,7 @@ Window {
                     }
                 }
 
+                // Управление
                 RowLayout {
                     Layout.fillWidth: true
 
@@ -254,6 +290,40 @@ Window {
                         onClicked: win.capsuleRequested()
                     }
                 }
+
+                // Громкость
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    IconButton {
+                        iconName: Music.player.muted || Music.player.volume <= 0 ? "mute" : "volume"
+                        text: Music.player.muted ? "Включить звук" : "Без звука"
+                        implicitWidth: 32; implicitHeight: 32
+                        iconSize: 17
+                        iconColor: Music.player.muted ? Theme.faint : Theme.dim
+                        onClicked: Music.player.muted = !Music.player.muted
+                    }
+                    GlassSlider {
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 100
+                        value: Music.player.muted ? 0 : Music.player.volume
+                        smoothing: 90
+                        accent: win.accent
+                        onMoved: (v) => {
+                            if (Music.player.muted)
+                                Music.player.muted = false
+                            Music.player.volume = v
+                        }
+                    }
+                    Label {
+                        text: Music.player.muted ? "выкл" : Math.round(Music.player.volume) + "%"
+                        color: Theme.faint
+                        font.pixelSize: 11
+                        Layout.preferredWidth: 30
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
             }
 
             // Всплывающая громкость при прокрутке колеса.
@@ -296,8 +366,8 @@ Window {
             }
         }
 
-        // ── Обратная сторона: настройки ───────────────────────────────────
-        back: GlassPane {
+        // ── Настройки ─────────────────────────────────────────────────────
+        GlassPane {
             id: back
             window: win
             originX: card.x
@@ -308,11 +378,32 @@ Window {
             accent: win.accent
             implicitHeight: backColumn.implicitHeight + 36
 
+            // Мягкое появление навстречу: наклон с другой стороны.
+            opacity: card.showSettings ? 1 : 0
+            scale: card.showSettings ? 1 : 1.05
+            visible: opacity > 0.01
+            transform: Rotation {
+                origin.x: back.width / 2
+                origin.y: back.height / 2
+                axis { x: 0; y: 1; z: 0 }
+                angle: card.showSettings ? 0 : 14
+                Behavior on angle { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+            }
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: card.showSettings ? 140 : 0 }
+                    NumberAnimation { duration: card.showSettings ? 420 : 240; easing.type: Easing.OutCubic }
+                }
+            }
+            Behavior on scale { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } }
+
             ColumnLayout {
                 id: backColumn
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
                 anchors.margins: 18
-                spacing: 12
+                spacing: 14
 
                 RowLayout {
                     spacing: 6
@@ -320,7 +411,7 @@ Window {
                         iconName: "back"
                         text: "Назад"
                         iconSize: 18
-                        onClicked: card.flipped = false
+                        onClicked: card.showSettings = false
                     }
                     Label {
                         text: "Настройки"
@@ -332,38 +423,19 @@ Window {
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 10
                     RowLayout {
                         Label { text: "Прозрачность стекла"; color: Theme.fg; font.pixelSize: 14; Layout.fillWidth: true }
                         Label { text: Math.round((1 - prefs.glassOpacity) * 100) + "%"; color: Theme.faint; font.pixelSize: 12 }
                     }
-                    Slider {
-                        id: glassSlider
+                    GlassSlider {
                         Layout.fillWidth: true
-                        from: 0.85
-                        to: 0.2
-                        value: prefs.glassOpacity
-                        onMoved: prefs.glassOpacity = value
-                        background: Rectangle {
-                            x: glassSlider.leftPadding
-                            y: glassSlider.topPadding + glassSlider.availableHeight / 2 - height / 2
-                            width: glassSlider.availableWidth
-                            height: 4
-                            radius: 2
-                            color: Qt.rgba(1, 1, 1, 0.15)
-                            Rectangle {
-                                width: glassSlider.visualPosition * parent.width
-                                height: parent.height
-                                radius: 2
-                                color: win.accent
-                            }
-                        }
-                        handle: Rectangle {
-                            x: glassSlider.leftPadding + glassSlider.visualPosition * (glassSlider.availableWidth - width)
-                            y: glassSlider.topPadding + glassSlider.availableHeight / 2 - height / 2
-                            width: 16; height: 16; radius: 8
-                            color: "white"
-                        }
+                        from: 0.15
+                        to: 0.8
+                        value: 1 - prefs.glassOpacity
+                        smoothing: 0
+                        accent: win.accent
+                        onMoved: (v) => prefs.glassOpacity = 1 - v
                     }
                 }
 
@@ -406,12 +478,15 @@ Window {
                     background: Rectangle {
                         radius: 12
                         color: quitBtn.hovered ? Qt.rgba(1, 0.16, 0.21, 0.22) : Qt.rgba(1, 0.16, 0.21, 0.12)
+                        Behavior on color { ColorAnimation { duration: Theme.durFast } }
                     }
-                    contentItem: Row {
-                        spacing: 8
-                        Item { width: (quitBtn.width - 18 - 8 - quitLabel.implicitWidth) / 2 - quitBtn.leftPadding; height: 1 }
-                        Icon { name: "power"; size: 18; color: "#ff8a95"; anchors.verticalCenter: parent.verticalCenter }
-                        Label { id: quitLabel; text: quitBtn.text; color: "#ff8a95"; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter }
+                    contentItem: Item {
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Icon { name: "power"; size: 18; color: "#ff8a95"; anchors.verticalCenter: parent.verticalCenter }
+                            Label { text: quitBtn.text; color: "#ff8a95"; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter }
+                        }
                     }
                 }
             }
