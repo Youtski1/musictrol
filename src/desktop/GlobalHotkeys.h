@@ -27,7 +27,8 @@ class GlobalHotkeys : public QObject, public QAbstractNativeEventFilter
     Q_PROPERTY(bool interactive READ interactive NOTIFY interactiveChanged)
 
 public:
-    explicit GlobalHotkeys(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit GlobalHotkeys(QObject *parent);
     ~GlobalHotkeys() override;
 
     static void setInstance(GlobalHotkeys *instance);

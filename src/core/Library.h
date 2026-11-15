@@ -68,7 +68,8 @@ class Library : public QObject
     Q_PROPERTY(int favoritesRevision READ favoritesRevision NOTIFY favoritesChanged)
 
 public:
-    explicit Library(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit Library(QObject *parent);
     ~Library() override;
 
     static void setInstance(Library *instance);

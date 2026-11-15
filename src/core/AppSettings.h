@@ -16,7 +16,8 @@ class AppSettings : public QObject
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY autostartChanged)
 
 public:
-    explicit AppSettings(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit AppSettings(QObject *parent);
 
     static void setInstance(AppSettings *instance);
     static AppSettings *create(QQmlEngine *, QJSEngine *);

@@ -29,7 +29,8 @@ class Downloads : public QObject
     Q_PROPERTY(QString folder READ folder CONSTANT)
 
 public:
-    explicit Downloads(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit Downloads(QObject *parent);
     ~Downloads() override;
 
     static void setInstance(Downloads *instance);

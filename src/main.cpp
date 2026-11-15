@@ -53,21 +53,21 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     // Объекты объявлены раньше движка QML, значит живут дольше него.
-    AppSettings settings;
+    AppSettings settings(nullptr);
     AppSettings::setInstance(&settings);
-    Library library;
+    Library library(nullptr);
     Library::setInstance(&library);
-    Downloads downloads;
+    Downloads downloads(nullptr);
     Downloads::setInstance(&downloads);
-    MusicController controller;
+    MusicController controller(nullptr);
     MusicController::setInstance(&controller);
     QObject::connect(&controller, &MusicController::trackStarted, &library, &Library::addToHistory);
-    Lyrics lyrics;
+    Lyrics lyrics(nullptr);
     Lyrics::setInstance(&lyrics);
     QObject::connect(&controller, &MusicController::trackStarted, &lyrics, [&lyrics, &downloads](const Track &t) {
         lyrics.loadFor(t.videoId, t.title, t.artist, t.duration, downloads.localPath(t.videoId));
     });
-    GlobalHotkeys hotkeys;
+    GlobalHotkeys hotkeys(nullptr);
     GlobalHotkeys::setInstance(&hotkeys);
 
     QLocalServer server;

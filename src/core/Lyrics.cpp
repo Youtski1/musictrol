@@ -112,6 +112,7 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
     setStatus(QStringLiteral("loading"));
     QString artist, title;
     guessArtistTitle(rawTitle, channel, artist, title);
+    qInfo().noquote() << "lyrics: ищу" << artist << "—" << title;
 
     QUrl url(QStringLiteral("https://lrclib.net/api/search"));
     QUrlQuery q;
@@ -129,6 +130,7 @@ void Lyrics::loadFor(const QString &videoId, const QString &rawTitle, const QStr
         m_reply = nullptr;
 
         const QJsonArray arr = QJsonDocument::fromJson(reply->readAll()).array();
+        qInfo().noquote() << "lyrics: ответ" << reply->error() << "вариантов:" << arr.size();
         // Лучший вариант: с таймингами и близкий по длительности.
         QJsonObject best;
         double bestScore = -1e9;
@@ -184,6 +186,7 @@ void Lyrics::setResult(const QString &text, bool synced)
             m_lines.append(QVariantMap{{QStringLiteral("time"), -1}, {QStringLiteral("text"), l.trimmed()}});
     }
     m_status = m_lines.isEmpty() ? QStringLiteral("notfound") : QStringLiteral("found");
+    qInfo().noquote() << "lyrics:" << m_status << "строк:" << m_lines.size() << (synced ? "с таймингами" : "без таймингов");
     emit changed();
 }
 

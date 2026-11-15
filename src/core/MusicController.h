@@ -39,7 +39,8 @@ class MusicController : public QObject
     Q_PROPERTY(QColor accentColor READ accentColor NOTIFY accentColorChanged)
 
 public:
-    explicit MusicController(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit MusicController(QObject *parent);
     ~MusicController() override;
 
     // Экземпляр создаётся в main(), QML получает тот же объект.

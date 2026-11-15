@@ -25,7 +25,8 @@ class Lyrics : public QObject
     Q_PROPERTY(QString status READ status NOTIFY changed)
 
 public:
-    explicit Lyrics(QObject *parent = nullptr);
+    // Без значения по умолчанию: иначе QML создаёт свою копию вместо нашей (create()).
+    explicit Lyrics(QObject *parent);
 
     static void setInstance(Lyrics *instance);
     static Lyrics *create(QQmlEngine *, QJSEngine *);
