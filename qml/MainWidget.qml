@@ -191,15 +191,23 @@ Window {
                         IconButton {
                             iconName: "search"
                             text: "Поиск"
-                            implicitWidth: 32; implicitHeight: 32
+                            implicitWidth: 30; implicitHeight: 32
                             iconSize: 16
                             iconColor: Theme.faint
                             onClicked: win.searchRequested()
                         }
                         IconButton {
+                            iconName: "wave"
+                            text: "Выпустить капсулу (перемотка сверху)"
+                            implicitWidth: 30; implicitHeight: 32
+                            iconSize: 16
+                            iconColor: Theme.faint
+                            onClicked: win.capsuleRequested()
+                        }
+                        IconButton {
                             iconName: "pin"
                             text: prefs.locked ? "Открепить" : "Закрепить на месте"
-                            implicitWidth: 32; implicitHeight: 32
+                            implicitWidth: 30; implicitHeight: 32
                             iconSize: 16
                             iconColor: prefs.locked ? Qt.lighter(win.accent, 1.35) : Theme.faint
                             baseColor: prefs.locked ? Qt.alpha(win.accent, 0.2) : "transparent"
@@ -209,7 +217,7 @@ Window {
                             id: gearBtn
                             iconName: "settings"
                             text: "Настройки"
-                            implicitWidth: 32; implicitHeight: 32
+                            implicitWidth: 30; implicitHeight: 32
                             iconSize: 16
                             iconColor: Theme.faint
                             onClicked: {

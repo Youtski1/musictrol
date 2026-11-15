@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(musictrol VERSION 0.3.0 LANGUAGES CXX)
+project(musictrol VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,6 +51,7 @@ qt_add_qml_module(musictrol
         qml/components/IconButton.qml
         qml/components/GlassSlider.qml
         qml/components/VolumePill.qml
+        qml/components/WaveSeek.qml
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml

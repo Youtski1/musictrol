@@ -156,7 +156,7 @@ Window {
     // ── Затемнение ──────────────────────────────────────────────────────
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0.02, 0.015, 0.04, 0.38)
+        color: Qt.rgba(0.02, 0.015, 0.04, 0.56)
         opacity: overlay.opened ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
     }

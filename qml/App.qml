@@ -13,7 +13,8 @@ QtObject {
     }
 
     property MainWidget mainWidget: MainWidget {
-        onSearchRequested: app.panel.open(screen)
+        onSearchRequested: app.panel.open(app.mini.screen)
+        onCapsuleRequested: app.mini.setWaveMode(!app.mini.waveMode)
     }
 
     // Повторный запуск программы — открыть панель музыки.
@@ -31,34 +32,27 @@ QtObject {
         repeat: true
         onTriggered: {
             const dir = Qt.application.arguments[app.snapshotArg + 1]
-            const main = app.mainWidget.contentItem
+            const save = (win, name) => win.contentItem.grabToImage(r => r.saveToFile(dir + "/" + name + ".png"))
             switch (step) {
             case 0:
-                main.grabToImage(r => r.saveToFile(dir + "/player.png"))
-                app.mini.contentItem.grabToImage(r => r.saveToFile(dir + "/mini.png"))
-                app.mainWidget.peekVolume()
-                Music.search("lofi hip hop")
-                interval = 600
-                break
-            case 1:
-                main.grabToImage(r => r.saveToFile(dir + "/volume.png"))
-                app.mainWidget.setSettingsOpen(true)
-                interval = 2500
-                break
-            case 2:
-                main.grabToImage(r => r.saveToFile(dir + "/settings.png"))
-                app.mainWidget.setSettingsOpen(false)
-                app.panel.open(app.mini.screen)
-                break
-            case 3:
-                app.panel.contentItem.grabToImage(r => r.saveToFile(dir + "/panel.png"))
+                save(app.mainWidget, "player")
+                save(app.mini, "capsule-circle")
+                app.mini.forceExpanded(true)
                 interval = 900
                 break
-            case 4:
-                app.panel.setSection(app.panel.secPlaylists)
+            case 1:
+                save(app.mini, "capsule-expanded")
+                app.mini.forceExpanded(false)
+                app.mini.setWaveMode(true)
                 break
-            case 5:
-                app.panel.contentItem.grabToImage(r => { r.saveToFile(dir + "/panel-playlists.png"); Qt.quit() })
+            case 2:
+                save(app.mini, "capsule-wave")
+                app.mini.setWaveMode(false)
+                app.panel.open(app.mini.screen)
+                interval = 1200
+                break
+            case 3:
+                app.panel.contentItem.grabToImage(r => { r.saveToFile(dir + "/panel.png"); Qt.quit() })
                 stop()
                 break
             }
