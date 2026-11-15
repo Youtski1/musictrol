@@ -18,14 +18,29 @@ Window {
     property bool waveMode: false
     signal togglePanel()
 
+    // На каком мониторе жить: имя экрана из настроек, иначе — экран главной карточки.
+    property string preferredScreen: ""
+    property string followScreen: ""
+    readonly property var targetScreen: {
+        const list = Qt.application.screens
+        const want = preferredScreen.length > 0 ? preferredScreen : followScreen
+        for (let i = 0; i < list.length; ++i) {
+            if (list[i].name === want)
+                return list[i]
+        }
+        return list.length > 0 ? list[0] : null
+    }
+
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
     title: "Musictrol capsule"
-    x: Screen.virtualX
-    y: Screen.virtualY
-    width: Screen.width
+    screen: targetScreen
+    x: targetScreen ? targetScreen.virtualX : 0
+    y: targetScreen ? targetScreen.virtualY : 0
+    width: targetScreen ? targetScreen.width : 1280
     height: 150
     visible: true
+    onTargetScreenChanged: Qt.callLater(() => WindowHelper.setupWidgetWindow(mini, WindowHelper.Above))
 
     property color accent: Music.accentColor
     Behavior on accent { ColorAnimation { duration: 700 } }
