@@ -3,6 +3,9 @@
 #include <QObject>
 #include <QtQmlIntegration>
 
+class QQmlEngine;
+class QJSEngine;
+
 // Системные настройки приложения, которые нельзя хранить просто в QSettings
 // (автозапуск — это файл в ~/.config/autostart).
 class AppSettings : public QObject
@@ -15,6 +18,9 @@ class AppSettings : public QObject
 public:
     explicit AppSettings(QObject *parent = nullptr);
 
+    static void setInstance(AppSettings *instance);
+    static AppSettings *create(QQmlEngine *, QJSEngine *);
+
     bool autostart() const;
     void setAutostart(bool enabled);
 
@@ -22,7 +28,10 @@ public:
 
 signals:
     void autostartChanged();
+    // Программу запустили ещё раз — первая копия открывает панель музыки.
+    void activateRequested();
 
 private:
     static QString autostartFile();
+    static AppSettings *s_instance;
 };

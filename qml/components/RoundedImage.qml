@@ -1,24 +1,33 @@
 import QtQuick
 import QtQuick.Effects
 
-// Картинка со скруглёнными углами (обложки).
+// Картинка со скруглёнными углами (обложки). Если основная картинка
+// не загрузилась (например, большой обложки у видео нет) — берётся запасная.
 Item {
     id: root
 
     property url source
+    property url fallbackSource
     property real radius: 12
     readonly property bool ready: img.status === Image.Ready
+
+    property bool useFallback: false
+    onSourceChanged: useFallback = false
 
     Image {
         id: img
         anchors.fill: parent
-        source: root.source
+        source: root.useFallback ? root.fallbackSource : root.source
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         smooth: true
         mipmap: true
         sourceSize: Qt.size(root.width * 2, root.height * 2)
         visible: false
+        onStatusChanged: {
+            if (status === Image.Error && !root.useFallback && root.fallbackSource.toString() !== "")
+                root.useFallback = true
+        }
     }
 
     Rectangle {

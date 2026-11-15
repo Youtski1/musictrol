@@ -58,3 +58,39 @@ void TrackListModel::clear()
 {
     setTracks({});
 }
+
+void TrackListModel::append(const Track &track)
+{
+    const int row = int(m_tracks.size());
+    beginInsertRows({}, row, row);
+    m_tracks.append(track);
+    endInsertRows();
+    emit countChanged();
+}
+
+void TrackListModel::prepend(const Track &track)
+{
+    beginInsertRows({}, 0, 0);
+    m_tracks.prepend(track);
+    endInsertRows();
+    emit countChanged();
+}
+
+void TrackListModel::removeAt(int row)
+{
+    if (row < 0 || row >= m_tracks.size())
+        return;
+    beginRemoveRows({}, row, row);
+    m_tracks.removeAt(row);
+    endRemoveRows();
+    emit countChanged();
+}
+
+int TrackListModel::indexOfVideo(const QString &videoId) const
+{
+    for (int i = 0; i < m_tracks.size(); ++i) {
+        if (m_tracks.at(i).videoId == videoId)
+            return i;
+    }
+    return -1;
+}

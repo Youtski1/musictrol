@@ -4,11 +4,27 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJSEngine>
+#include <QQmlEngine>
 #include <QStandardPaths>
+
+AppSettings *AppSettings::s_instance = nullptr;
 
 AppSettings::AppSettings(QObject *parent)
     : QObject(parent)
 {
+}
+
+void AppSettings::setInstance(AppSettings *instance)
+{
+    s_instance = instance;
+}
+
+AppSettings *AppSettings::create(QQmlEngine *, QJSEngine *)
+{
+    Q_ASSERT(s_instance);
+    QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
+    return s_instance;
 }
 
 QString AppSettings::autostartFile()

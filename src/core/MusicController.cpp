@@ -91,11 +91,12 @@ void MusicController::search(const QString &query)
     m_search->search(query);
 }
 
-void MusicController::playResult(int index)
+void MusicController::playFrom(TrackListModel *model, int index)
 {
-    if (index < 0 || index >= m_results->count())
+    if (!model || index < 0 || index >= model->count())
         return;
-    m_queue->setTracks(m_results->tracks());
+    if (model != m_queue)
+        m_queue->setTracks(model->tracks());
     playQueueIndex(index);
 }
 
@@ -107,16 +108,28 @@ void MusicController::playQueueIndex(int index)
     playTrack(m_queue->at(index));
 }
 
-void MusicController::enqueueResult(int index)
+void MusicController::enqueue(TrackListModel *model, int index)
 {
-    const Track t = m_results->at(index);
+    if (!model)
+        return;
+    const Track t = model->at(index);
     if (!t.isValid())
         return;
-    TrackList list = m_queue->tracks();
-    list.append(t);
-    m_queue->setTracks(list);
+    m_queue->append(t);
     if (!hasTrack())
-        playQueueIndex(int(list.size()) - 1);
+        playQueueIndex(m_queue->count() - 1);
+}
+
+void MusicController::removeFromQueue(int index)
+{
+    if (index < 0 || index >= m_queue->count())
+        return;
+    m_queue->removeAt(index);
+    // Текущий трек продолжает играть; «следующий» — тот, что шёл после удалённого.
+    if (index <= m_currentIndex) {
+        --m_currentIndex;
+        emit currentChanged();
+    }
 }
 
 void MusicController::next()
@@ -171,6 +184,7 @@ void MusicController::playTrack(const Track &track)
     clearError();
     m_player->load(track.url);
     emit currentChanged();
+    emit trackStarted(track);
     fetchAccent(track.thumbnail);
 }
 

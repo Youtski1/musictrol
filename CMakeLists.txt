@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(musictrol VERSION 0.2.0 LANGUAGES CXX)
+project(musictrol VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,8 @@ qt_add_executable(musictrol
     src/core/MusicController.cpp
     src/core/AppSettings.h
     src/core/AppSettings.cpp
+    src/core/Library.h
+    src/core/Library.cpp
     src/player/MpvPlayer.h
     src/player/MpvPlayer.cpp
     src/youtube/YouTubeSearch.h
@@ -43,7 +45,8 @@ qt_add_qml_module(musictrol
         qml/App.qml
         qml/Theme.qml
         qml/MainWidget.qml
-        qml/DevWindow.qml
+        qml/MiniWidget.qml
+        qml/MusicPanel.qml
         qml/components/Icon.qml
         qml/components/IconButton.qml
         qml/components/GlassSlider.qml
@@ -51,6 +54,8 @@ qt_add_qml_module(musictrol
         qml/components/RoundedImage.qml
         qml/components/GlassPane.qml
         qml/components/Toggle.qml
+        qml/components/PillButton.qml
+        qml/components/PlaylistPicker.qml
 )
 
 target_link_libraries(musictrol PRIVATE

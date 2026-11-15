@@ -61,9 +61,11 @@ public:
     QColor accentColor() const { return m_accent; }
 
     Q_INVOKABLE void search(const QString &query);
-    Q_INVOKABLE void playResult(int index);   // играть из результатов, очередь = результаты
+    // Играть трек из любого списка (поиск, избранное, плейлист…): очередь = этот список.
+    Q_INVOKABLE void playFrom(TrackListModel *model, int index);
     Q_INVOKABLE void playQueueIndex(int index);
-    Q_INVOKABLE void enqueueResult(int index); // добавить в конец очереди
+    Q_INVOKABLE void enqueue(TrackListModel *model, int index); // в конец очереди
+    Q_INVOKABLE void removeFromQueue(int index);
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
     Q_INVOKABLE void togglePause();
@@ -75,6 +77,7 @@ signals:
     void errorTextChanged();
     void currentChanged();
     void accentColorChanged();
+    void trackStarted(const Track &track); // для истории
 
 private:
     void setError(const QString &text);

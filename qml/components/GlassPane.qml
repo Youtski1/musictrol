@@ -17,14 +17,19 @@ Item {
     property real radius: Theme.radiusCard
     property real tintOpacity: 0.55
     property color accent: Theme.brand
+    // Окна поверх других окон не могут брать обои как «стекло» — там под ними
+    // чужие окна. Для них — плотная тонировка без обоев.
+    property bool useWallpaper: true
+    property color borderColor: Theme.glassBorder
+    property real shadowBlur: 36
 
     default property alias content: holder.data
 
     RectangularShadow {
         anchors.fill: glass
         radius: pane.radius
-        blur: 36
-        offset.y: 14
+        blur: pane.shadowBlur
+        offset.y: pane.shadowBlur * 0.4
         color: Qt.rgba(0, 0, 0, 0.45)
     }
 
@@ -40,7 +45,8 @@ Item {
         }
 
         Image {
-            source: Wallpaper.revision >= 0 ? Wallpaper.blurredFor(pane.Screen.name) : ""
+            visible: pane.useWallpaper
+            source: pane.useWallpaper && Wallpaper.revision >= 0 ? Wallpaper.blurredFor(pane.Screen.name) : ""
             x: -(pane.window.x + pane.originX - pane.Screen.virtualX)
             y: -(pane.window.y + pane.originY - pane.Screen.virtualY)
             width: pane.Screen.width
@@ -89,7 +95,8 @@ Item {
         radius: pane.radius
         color: "transparent"
         border.width: 1
-        border.color: Theme.glassBorder
+        border.color: pane.borderColor
+        Behavior on border.color { ColorAnimation { duration: 300 } }
     }
 
     Item {

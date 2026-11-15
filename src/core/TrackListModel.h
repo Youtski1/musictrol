@@ -35,6 +35,10 @@ public:
 
     void setTracks(const TrackList &tracks);
     void clear();
+    void append(const Track &track);
+    void prepend(const Track &track);
+    void removeAt(int row);
+    int indexOfVideo(const QString &videoId) const;
 
 signals:
     void countChanged();
