@@ -12,6 +12,26 @@ AbstractButton {
     property string status: ""
     property color accent: Theme.brand
     property bool capturing: false
+    property string warning: ""
+
+    // Ввод сам заканчивается через 10 секунд или если окно потеряло фокус.
+    Timer { id: captureTimeout; interval: 10000; onTriggered: chip.stop() }
+    Timer { id: warningTimer; interval: 2500; onTriggered: chip.warning = "" }
+    Connections {
+        target: chip.Window.window
+        function onActiveChanged() { if (chip.Window.window && !chip.Window.window.active) chip.stop() }
+    }
+    Connections {
+        target: GlobalHotkeys
+        function onAssignRejected(id, reason) {
+            if (id !== chip.actionId)
+                return
+            chip.warning = reason
+            warningTimer.restart()
+            captureTimeout.restart()
+        }
+    }
+    onVisibleChanged: if (!visible) stop()
 
     signal captureStarted()
 
@@ -24,11 +44,13 @@ AbstractButton {
         if (!capturing)
             return
         capturing = false
+        captureTimeout.stop()
         GlobalHotkeys.suspend(false)
     }
 
     onClicked: {
         capturing = true
+        captureTimeout.restart()
         GlobalHotkeys.suspend(true)   // чтобы старые сочетания не срабатывали, пока вводим новое
         captureStarted()
         forceActiveFocus()
@@ -46,7 +68,8 @@ AbstractButton {
             stop()
         } else if ([Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R, Qt.Key_AltGr].indexOf(event.key) < 0) {
             GlobalHotkeys.assign(actionId, event.key, event.modifiers)
-            stop()
+            if (warning.length === 0)
+                Qt.callLater(() => { if (chip.warning.length === 0) chip.stop() })
         }
     }
 
@@ -66,7 +89,8 @@ AbstractButton {
         Text {
             id: label
             anchors.centerIn: parent
-            text: chip.capturing ? "Нажмите клавиши…"
+            text: chip.warning.length > 0 ? chip.warning
+                  : chip.capturing ? "Нажмите клавиши…"
                   : chip.sequence.length > 0 ? chip.sequence : "не задано"
             color: chip.capturing ? "white"
                    : chip.status === "busy" ? "#ff8a95"

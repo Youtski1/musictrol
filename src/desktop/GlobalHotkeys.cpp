@@ -95,6 +95,29 @@ bool isModifierKey(int key)
     }
 }
 
+// Без модификатора можно только «особые» клавиши; иначе перехват сломает
+// обычный ввод во всех программах (например, просто стрелки).
+bool allowedWithoutModifiers(int key)
+{
+    if (key >= Qt::Key_F1 && key <= Qt::Key_F24)
+        return true;
+    switch (key) {
+    case Qt::Key_MediaPlay: case Qt::Key_MediaTogglePlayPause: case Qt::Key_MediaStop:
+    case Qt::Key_MediaPrevious: case Qt::Key_MediaNext: case Qt::Key_VolumeDown:
+    case Qt::Key_VolumeUp: case Qt::Key_VolumeMute: case Qt::Key_Pause: case Qt::Key_Print:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isValidCombo(const QKeyCombination &combo)
+{
+    const Qt::KeyboardModifiers m = combo.keyboardModifiers()
+                                    & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier);
+    return m != Qt::NoModifier || allowedWithoutModifiers(combo.key());
+}
+
 QString displayText(const QString &portable)
 {
     if (portable.isEmpty())
@@ -127,6 +150,24 @@ GlobalHotkeys::GlobalHotkeys(QObject *parent)
     m_idleTimer.setSingleShot(true);
     m_idleTimer.setInterval(30000);
     connect(&m_idleTimer, &QTimer::timeout, this, &GlobalHotkeys::endInteractive);
+
+    m_suspendTimer.setSingleShot(true);
+    m_suspendTimer.setInterval(15000);
+    connect(&m_suspendTimer, &QTimer::timeout, this, [this] { suspend(false); });
+
+    m_retryTimer.setInterval(5000);
+    connect(&m_retryTimer, &QTimer::timeout, this, [this] {
+        if (m_suspended)
+            return;
+        bool changed = false;
+        for (Action &a : m_actions) {
+            if (a.status == QLatin1String("busy") && grab(a))
+                changed = true;
+        }
+        if (changed)
+            emit actionsChanged();
+    });
+    m_retryTimer.start();
 }
 
 GlobalHotkeys::~GlobalHotkeys()
@@ -183,6 +224,10 @@ void GlobalHotkeys::assign(const QString &actionId, int key, int modifiers)
     const QKeyCombination combo(Qt::KeyboardModifiers(modifiers & (Qt::ShiftModifier | Qt::ControlModifier
                                                                    | Qt::AltModifier | Qt::MetaModifier)),
                                 Qt::Key(key));
+    if (!isValidCombo(combo)) {
+        emit assignRejected(actionId, tr("Нужно сочетание с Ctrl, Alt, Super или Shift"));
+        return;
+    }
     const QString seq = QKeySequence(combo).toString(QKeySequence::PortableText);
 
     // Одно сочетание — одно действие: снимаем его с других.
@@ -219,10 +264,13 @@ void GlobalHotkeys::suspend(bool suspended)
     if (m_suspended == suspended)
         return;
     m_suspended = suspended;
-    if (suspended)
+    if (suspended) {
         ungrabAll();
-    else
+        m_suspendTimer.start();
+    } else {
+        m_suspendTimer.stop();
         grabAll();
+    }
     emit actionsChanged();
 }
 
@@ -233,6 +281,10 @@ void GlobalHotkeys::load()
     for (Action &a : m_actions) {
         if (s.contains(a.id))
             a.sequence = s.value(a.id).toString();
+        // Старые недопустимые назначения (одиночная клавиша) сбрасываем.
+        const QKeySequence ks = QKeySequence::fromString(a.sequence, QKeySequence::PortableText);
+        if (!ks.isEmpty() && !isValidCombo(ks[0]))
+            a.sequence.clear();
     }
 }
 
@@ -305,12 +357,14 @@ bool GlobalHotkeys::grab(Action &a)
             xcb_ungrab_key(c, code, root, mods | extra);
         xcb_flush(c);
         a.status = QStringLiteral("busy");
+        qInfo().noquote() << "hotkey" << a.id << displayText(a.sequence) << "busy (занято другой программой)";
         return false;
     }
     xcb_flush(c);
     a.keycode = code;
     a.mods = mods;
     a.status = QStringLiteral("ok");
+    qInfo().noquote() << "hotkey" << a.id << displayText(a.sequence) << "ok";
     return true;
 }
 

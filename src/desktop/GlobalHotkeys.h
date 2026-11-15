@@ -55,6 +55,8 @@ signals:
     // key — имя клавиши X11 (Left, Return, BackSpace, space, Prior, Next…, "SuperKey"),
     // text — напечатанный символ с учётом раскладки (пусто для служебных клавиш).
     void interactiveKey(const QString &key, const QString &text);
+    // Сочетание не принято (например, одиночная клавиша без Ctrl/Alt/Super/Shift).
+    void assignRejected(const QString &actionId, const QString &reason);
 
 private:
     struct Action {
@@ -81,6 +83,8 @@ private:
     bool m_suspended = false;
     bool m_interactive = false;
     QTimer m_idleTimer;   // страховка: без нажатий клавиатура возвращается игре
+    QTimer m_suspendTimer; // страховка: ввод сочетания не может «отпустить» клавиши навсегда
+    QTimer m_retryTimer;   // повторно забрать сочетания, которые были заняты
     xkb_context *m_xkbCtx = nullptr;
     xkb_keymap *m_keymap = nullptr;
     xkb_state *m_xkbState = nullptr;
