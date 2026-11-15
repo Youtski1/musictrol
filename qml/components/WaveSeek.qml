@@ -37,13 +37,13 @@ Item {
         return arr
     }
 
+    // 30 кадров в секунду — плавно и вдвое дешевле, чем 60.
     property real t: 0
-    NumberAnimation on t {
-        from: 0
-        to: Math.PI * 2
-        duration: 1800
-        loops: Animation.Infinite
+    Timer {
+        interval: 33
+        repeat: true
         running: ws.playing && ws.visible && ws.opacity > 0 && !area.pressed
+        onTriggered: ws.t = (ws.t + Math.PI * 2 * 0.033 / 1.8) % (Math.PI * 2)
     }
 
     Repeater {

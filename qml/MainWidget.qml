@@ -250,6 +250,7 @@ Window {
                         to: Music.player.duration
                         accent: win.accent
                         tooltipText: (v) => Music.formatTime(v)
+                        smoothing: 0   // без постоянной анимации — карточка перерисовывается только при сдвиге
                         onCommitted: (v) => Music.player.seek(v)
                     }
                     RowLayout {

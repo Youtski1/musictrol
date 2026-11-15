@@ -9,9 +9,9 @@
 #include <mpv/client.h>
 
 namespace {
-// Позицию обновляем не чаще ~10 раз в секунду: этого хватает для ползунка и
-// не гоняет перерисовку интерфейса на каждом аудиокадре.
-constexpr double kPositionStep = 0.1;
+// Позицию обновляем ~4 раза в секунду: на полосе в 340 px сдвиг за 0,25 с
+// меньше пикселя, а перерисовок интерфейса в разы меньше.
+constexpr double kPositionStep = 0.25;
 
 enum ObserveId : uint64_t {
     PauseId = 1,
@@ -43,7 +43,8 @@ MpvPlayer::MpvPlayer(QObject *parent)
     mpv_set_option_string(m_mpv, "volume", QByteArray::number(m_volume).constData());
     // Небольшой кэш, чтобы перемотка внутри загруженного куска была мгновенной.
     mpv_set_option_string(m_mpv, "cache", "yes");
-    mpv_set_option_string(m_mpv, "demuxer-max-bytes", "32MiB");
+    mpv_set_option_string(m_mpv, "demuxer-max-bytes", "8MiB");
+    mpv_set_option_string(m_mpv, "demuxer-max-back-bytes", "4MiB");
 
     mpv_observe_property(m_mpv, PauseId, "pause", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, TimePosId, "time-pos", MPV_FORMAT_DOUBLE);

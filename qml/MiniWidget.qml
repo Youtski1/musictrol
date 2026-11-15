@@ -327,8 +327,18 @@ Window {
     screen: targetScreen
     x: targetScreen ? targetScreen.virtualX : 0
     y: targetScreen ? targetScreen.virtualY : 0
-    width: targetScreen ? targetScreen.width : 1280
-    height: interactive ? 430 : 150
+    // Окно маленькое, пока капсула в углу; на всю ширину — только для полосы/HUD.
+    // Меньше площадь — меньше перерисовки (себя и композитора).
+    readonly property bool wideNeeded: waveMode || interactive || hud.visible
+    property bool wide: wideNeeded
+    onWideNeededChanged: {
+        if (wideNeeded) { shrinkTimer.stop(); wide = true }
+        else shrinkTimer.restart()   // дождаться, пока капсула доедет обратно в угол
+    }
+    Timer { id: shrinkTimer; interval: 650; onTriggered: mini.wide = false }
+    onWideChanged: Qt.callLater(updateInput)
+    width: wide ? (targetScreen ? targetScreen.width : 1280) : 480
+    height: interactive ? 430 : (wide ? 150 : 110)
     visible: true
     onTargetScreenChanged: Qt.callLater(() => WindowHelper.setupWidgetWindow(mini, WindowHelper.Above))
     onVisibleChanged: if (visible) Qt.callLater(() => { WindowHelper.setupWidgetWindow(mini, WindowHelper.Above); updateInput() })
@@ -381,12 +391,13 @@ Window {
         visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: 400 } }
 
+        // 30 кадров в секунду вместо 60: для мягких колец разницы не видно, нагрузка вдвое меньше.
         property real phase: 0
-        NumberAnimation on phase {
-            from: 0; to: 1
-            duration: 2000
-            loops: Animation.Infinite
+        Timer {
+            interval: 33
+            repeat: true
             running: ripples.visible
+            onTriggered: ripples.phase = (ripples.phase + 0.033 / 2.0) % 1
         }
 
         Repeater {
