@@ -1,5 +1,6 @@
 import QtQuick
 import QtCore
+import QtQml.Models
 import Musictrol
 
 // Корень приложения: держит все окна-виджеты и связывает их.
@@ -29,15 +30,29 @@ QtObject {
     }
 
     // Меню музыки для игр: поверх затемнённой игры, с живой полосой, без смены фокуса.
-    property MusicPanel gamePanel: MusicPanel {
-        gameMode: true
-        lyricsOnWidget: app.lyricsPrefs.onWidget
-        onLyricsToggled: (on) => app.lyricsPrefs.onWidget = on
+    // Игровое меню создаётся только когда запущена полноэкранная игра,
+    // и выгружается через минуту после выхода из неё (Alt+Tab не пересоздаёт).
+    readonly property bool gameMenuNeeded: app.mini.gameMode || gameKeepAlive.running
+                                           || (gamePanel !== null && gamePanel.opened)
+    property Timer gameKeepAlive: Timer { interval: 60000 }
+    property Connections gameWatch: Connections {
+        target: app.mini
+        function onGameModeChanged() { if (!app.mini.gameMode) app.gameKeepAlive.restart() }
     }
+    property Instantiator gameMenu: Instantiator {
+        model: 1
+        active: app.gameMenuNeeded || app.snapshotArg > 0
+        delegate: MusicPanel {
+            gameMode: true
+            lyricsOnWidget: app.lyricsPrefs.onWidget
+            onLyricsToggled: (on) => app.lyricsPrefs.onWidget = on
+        }
+    }
+    readonly property MusicPanel gamePanel: gameMenu.object as MusicPanel
 
     property MiniWidget mini: MiniWidget {
         panelOpen: app.panel.opened
-        externalInteractive: app.gamePanel.opened
+        externalInteractive: app.gamePanel !== null && app.gamePanel.opened
         gameBehavior: app.gamePrefs.behavior
         cornerEnabled: app.capsulePrefs.enabled
         onTogglePanel: app.panel.toggle(screen)
@@ -65,7 +80,7 @@ QtObject {
             case "panel":
                 // В игре — живая полоса с клавиатуры (игра остаётся активной),
                 // иначе — панель музыки.
-                if (app.mini.gameMode || app.gamePanel.opened) {
+                if (app.gamePanel !== null && (app.mini.gameMode || app.gamePanel.opened)) {
                     app.gamePanel.toggle(app.mini.screen)
                 } else {
                     app.panel.toggle(app.mini.screen)

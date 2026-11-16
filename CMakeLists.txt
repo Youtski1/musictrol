@@ -5,7 +5,7 @@ project(musictrol VERSION 0.4.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 Network Concurrent)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 Network Concurrent ShaderTools)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
 pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb xcb-shape xcb-keysyms xkbcommon xkbcommon-x11)
@@ -65,6 +65,13 @@ qt_add_qml_module(musictrol
         qml/components/Toggle.qml
         qml/components/PillButton.qml
         qml/components/PlaylistPicker.qml
+)
+
+# Шейдеры компилируются в .qsb при сборке (скругление обложек и т.п.).
+qt_add_shaders(musictrol "shaders"
+    PREFIX "/"
+    FILES
+        shaders/rounded.frag
 )
 
 target_link_libraries(musictrol PRIVATE
